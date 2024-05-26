@@ -3,8 +3,12 @@ name = "ensan"
 version = "0.1.0"
 edition = "2021"
 
+description = "Extended HCL expression evaluator"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 hcl-rs = "0.18.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_yml = "0.0.7"
 thiserror = "1.0.61"
