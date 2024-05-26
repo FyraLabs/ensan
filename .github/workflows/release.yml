@@ -1,7 +1,6 @@
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [published]
 
 jobs:
   release:
@@ -9,11 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: manoadamro/rust-release@v1
-        with:
-          owner: ${{ github.repository_owner }}
-          repo: ${{ github.repository }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - uses: manoadamro/rust-release@v1
+      #   with:
+      #     owner: ${{ github.repository_owner }}
+      #     repo: ${{ github.repository }}
+      #     token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1 #@v1
