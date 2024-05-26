@@ -1,4 +1,10 @@
-use hcl::{eval::{Context, Evaluate, FuncArgs, FuncDef, ParamType}, Value};
+use hcl::eval::FuncDef;
+use hcl::eval::ParamType;
+use hcl::{
+    eval::{Context, Evaluate, FuncArgs},
+    Value,
+};
+use std::borrow::BorrowMut;
 
 // #[hcl_func(ParamType::String)]
 // fn yamldecode(args: FuncArgs) -> Result<Value, String>
@@ -17,8 +23,10 @@ fn yamldecode(args: FuncArgs) -> Result<Value, String> {
 fn yamlencode(args: FuncArgs) -> Result<Value, String> {
     let args = args.iter().next().ok_or("No arguments provided")?;
 
-    Ok(Value::String(serde_yml::to_string(&args.to_string())
-    .map_err(|e| format!("Failed to serialize YAML: {}", e))?))
+    Ok(Value::String(
+        serde_yml::to_string(&args.to_string())
+            .map_err(|e| format!("Failed to serialize YAML: {}", e))?,
+    ))
 }
 
 /// Get value from environment variable
@@ -30,129 +38,165 @@ fn env(args: FuncArgs) -> Result<Value, String> {
         .map_err(|e| format!("Failed to get environment variable: {}", e))?)
 }
 
-#[derive(Debug, Clone)]
-pub struct Engine<'a, S: AsRef<str>> {
-    pub content: S,
-    pub ctx: hcl::eval::Context<'a>,
-}
-
-impl<'a, S: AsRef<str>> From<S> for Engine<'a, S> {
-    fn from(value: S) -> Self {
-        Engine { content: value, ctx: Context::new() }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ValStore {
-    pub key: String,
-    pub val: Option<Box<ValStore>>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum HclTree {
-    Root,
-    // identifier, labels
-    Block(Box<HclTree>, String, Vec<String>),
-    Attr(Box<HclTree>, String)
+pub enum VarScope {
+    Var(String, Value),
+    Scope(String, VarScopes),
 }
 
-impl HclTree {
-    pub fn block(&self, ident: String, labels: Vec<String>) -> HclTree {
-        HclTree::Block(Box::new(self.clone()), ident, labels)
-    }
-    pub fn attr(&self, key: String) -> HclTree {
-        HclTree::Attr(Box::new(self.clone()), key)
-    }
-}
-
-
-// ```hcl
-// project "hai" "bai" {
-//    field = "value"
-// }
-// project.hai.bai.field = "value"
-// hai = {
-///}
-
-// ``` 
-impl<'a, S: AsRef<str>> Engine<'a, S> {
-    // fn _set_val_collect_idents(idents: &mut Vec<String>, mut inner: Box<HclTree>) {
-    //     loop {
-    //         match *inner {
-    //             HclTree::Root => break,
-    //             HclTree::Attr(x, name) => {
-    //                 idents.push(name);
-    //                 inner = x;
-    //             },
-    //             HclTree::Block(x, ident, labels) => {
-    //                 for label in labels.into_iter().rev() {
-    //                     idents.push(label);
-    //                 }
-    //                 idents.push(ident);
-    //                 inner = x;
-    //             }
-    //         }
-    //     }
-    //     idents.reverse();
-    // }
-    // pub fn set_value(&mut self, name: HclTree, value: Value) {
-    //     match name {
-    //         HclTree::Root => panic!("Wrong use of HclTree::Root as ident"),
-    //         HclTree::Attr(inner, name) => {
-    //             let mut idents = vec![name];
-    //             Self::_set_val_collect_idents(&mut idents, inner);
-    //             for i in 0..idents.len()-1 {
-    //                 self.ctx.declare_var(idents[0..i].join("."), hcl::value!({}));
-    //             }
-    //             self.ctx.declare_var(idents.join("."), value);
-    //         },
-    //         HclTree::Block(inner, ident, labels) => {
-    //             let mut idents = labels;
-    //             idents.reverse();
-    //             idents.push(ident);
-    //             Self::_set_val_collect_idents(&mut idents, inner);
-    //             for i in 0..idents.len()-1 {
-    //                 self.ctx.declare_var(idents[0..i].join("."), hcl::value!({}));
-    //             }
-    //             self.ctx.declare_var(idents.join("."), value);
-    //         },
-    //     }
-    // }
-        
-    // pub fn add_structure_to_ctx(&mut self, structure: &mut hcl::Structure, root: HclTree) -> Res<()> {
-    //     if let Some(attr) = structure.as_attribute_mut() {
-    //         let value = attr.expr.evaluate(&self.ctx)?;
-    //         attr.expr = value.clone().into();
-    //         self.set_value(root.attr(attr.key.to_string()), value);
-    //     } else if let Some(block) = structure.as_block_mut() {
-    //         let newroot = root.block(block.identifier.to_string(), block.labels.iter().map(|l| l.as_str().to_string()).collect());
-    //         for structure in &mut block.body {
-    //             self.add_structure_to_ctx(structure, newroot.clone())?;
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
-    pub fn _parse_inner(&mut self, body: &mut hcl::Value) -> hcl::Value {
-        if let Some(obj) = body.as_object_mut() {
-            for val in obj.values_mut() {
-                *val = self._parse_inner(val);
-            }
+impl VarScope {
+    #[must_use]
+    pub fn get_scope_mut(&mut self, scope: &str) -> Option<&mut VarScopes> {
+        match self {
+            Self::Scope(key, varscopes) if key == scope => Some(varscopes),
+            _ => None,
         }
     }
-    pub fn parse(&mut self) -> Res<hcl::Body> {
-        let mut rawbody = hcl::parse(self.content.as_ref())?;
-        crate::add_hcl_fns!(self.ctx =>
+    #[must_use]
+    pub fn get_scope_ref(&self, scope: &str) -> Option<&VarScopes> {
+        match self {
+            Self::Scope(key, varscopes) if key == scope => Some(varscopes),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct VarScopes(Vec<VarScope>);
+
+impl From<Vec<VarScope>> for VarScopes {
+    fn from(value: Vec<VarScope>) -> Self {
+        Self(value)
+    }
+}
+
+impl VarScopes {
+    #[must_use]
+    pub fn as_vec_mut(&mut self) -> Vec<&mut VarScope> {
+        self.0.iter_mut().collect()
+    }
+    #[must_use]
+    pub fn as_vec_ref(&self) -> Vec<&VarScope> {
+        self.0.iter().collect()
+    }
+    #[must_use]
+    pub fn list_in_scope_mut(&mut self, scope: &[&str]) -> Vec<&mut VarScope> {
+        let [first, remaining @ ..] = scope else {
+            return self.as_vec_mut();
+        };
+        self.0
+            .iter_mut()
+            .filter_map(|varscope| varscope.get_scope_mut(first))
+            .flat_map(|varscopes| varscopes.list_in_scope_mut(remaining))
+            .collect()
+    }
+    #[must_use]
+    pub fn list_in_scope_ref(&self, scope: &[&str]) -> Vec<&VarScope> {
+        let [first, remaining @ ..] = scope else {
+            return self.as_vec_ref();
+        };
+        self.0
+            .iter()
+            .filter_map(|varscope| varscope.get_scope_ref(first))
+            .flat_map(|varscopes| varscopes.list_in_scope_ref(remaining))
+            .collect()
+    }
+    #[must_use]
+    pub fn to_hcl_value(&self) -> Value {
+        let mut indexmap = hcl::Map::new();
+        self.0.iter().for_each(|x| match x {
+            VarScope::Var(k, v) => _ = indexmap.insert(k.clone(), v.clone()),
+            VarScope::Scope(k, v) => _ = indexmap.insert(k.clone(), v.to_hcl_value()),
+        });
+        Value::Object(indexmap)
+    }
+    #[must_use]
+    pub fn to_hcl_ctx(&self, scope: &[impl AsRef<str>]) -> Context {
+        let mut ctx = Context::new();
+        self.list_in_scope_ref(&scope.iter().map(AsRef::as_ref).collect::<Vec<_>>())
+            .into_iter()
+            .for_each(|varscopes| match varscopes {
+                VarScope::Var(k, v) => ctx.declare_var(k.to_string(), v.to_owned()),
+                VarScope::Scope(k, v) => ctx.declare_var(k.to_string(), v.to_hcl_value()),
+            });
+        ctx
+    }
+    pub fn set(&mut self, scope: &[String], key: String, value: Value) {
+        let [first, rest @ ..] = scope else {
+            self.0.push(VarScope::Var(key, value));
+            return;
+        };
+        if let Some(s) = self.0.iter_mut().find_map(|s| s.get_scope_mut(first)) {
+            s.set(&rest, key, value);
+        } else {
+            let mut new = VarScopes::default();
+            new.set(rest, key, value); // TODO: optimizations
+            self.0.push(VarScope::Scope(first.to_string(), new));
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Engine<S: AsRef<str>> {
+    pub content: S,
+    scope: Vec<String>,
+    pub varlist: VarScopes,
+}
+
+impl<S: AsRef<str>> From<S> for Engine<S> {
+    fn from(value: S) -> Self {
+        Engine {
+            content: value,
+            scope: vec![],
+            varlist: Default::default(),
+        }
+    }
+}
+impl<S: AsRef<str>> Engine<S> {
+    pub fn scope_refed(&self) -> Vec<&str> {
+        // TODO: might be a bit expensive to evaluate this multiple times
+        // but let's just hope the compiler optimizes this
+        self.scope.iter().map(String::as_str).collect()
+    }
+    pub fn init_ctx(&mut self, ctx: &mut Context) {
+        crate::add_hcl_fns!(ctx =>
             yamldecode[String]
             yamlencode[String]
             env[String]
         );
-        let mut body: hcl::Value = hcl::from_body(rawbody)?;
-        self._parse_inner(&mut body);
-        for structure in &mut rawbody {
-            self.add_structure_to_ctx(structure, HclTree::Root)?;
+    }
+    pub fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
+        let old_scope_len = self.scope.len();
+        {
+            self.scope.push(block.identifier.to_string());
+            self.scope
+                .extend(block.labels.iter().map(|bl| bl.to_owned().into_inner()));
+            for structure in &mut block.body {
+                self.parse_struct(structure)?;
+            }
         }
-        Ok(rawbody)
+        self.scope.drain(old_scope_len..);
+        Ok(())
+    }
+
+    fn parse_struct(&mut self, structure: &mut hcl::Structure) -> Res<()> {
+        let ctx = self.varlist.to_hcl_ctx(&self.scope);
+        Ok(if let Some(attr) = structure.as_attribute_mut() {
+            let val = attr.expr.evaluate(&ctx)?;
+            self.varlist
+                .set(&self.scope, attr.key.to_string(), val.clone());
+            *attr.expr.borrow_mut() = val.into();
+        } else if let Some(block) = structure.as_block_mut() {
+            self.parse_block(block)?;
+        })
+    }
+
+    pub fn parse(&mut self) -> Res<hcl::Body> {
+        let mut body = hcl::parse(self.content.as_ref())?;
+        for structure in &mut body {
+            self.parse_struct(structure)?;
+        }
+        Ok(body)
     }
 }
 
@@ -161,9 +205,9 @@ impl<'a, S: AsRef<str>> Engine<'a, S> {
 /// block "name" {
 ///     foo = "bar"
 /// }
-/// 
+///
 /// ```zzz
-/// 
+///
 /// equals:
 /// ```hcl
 /// block = [
@@ -221,11 +265,10 @@ fn test_eval_replacement() {
     //     foo: String,
     // }
 
-    // let 
+    // let
 
-    // let val: Config = 
+    // let val: Config =
     // println!("{:?}", val);
 
     // assert_eq!(val, Config { key: "value".into(), foo: "value".into() });
-    
 }
