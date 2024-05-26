@@ -1,12 +1,51 @@
-//! # Ensan Engine
+//! # Ensan Expression Engine (for HCL)
 //!
 //! This module contains the [`Engine`] implementation.
 //! You may use the engine to parse hcl-formatted strings.
 //!
 //! # Examples
 //! ```
-//! use crate::Engine;
+//! use ensan::Engine;
+//! let cfg = r#"
+//! // key = "value"
+//! arr = ["hai", "bai"]
+//! foo = arr[0]
+//! obj = {
+//!     key = "value"
+//! }
+//! my_block "hai" {
+//!     foo = "bar"
+//!     baz = "nya"
+//! }
 //! 
+//! nested_str = "${my_block.hai.foo}"
+//! "#;
+//! 
+//! let expected = r#"
+//! arr = ["hai", "bai"]
+//! foo = "hai"
+//! obj = {
+//!     key = "value"
+//! }
+//! my_block "hai" {
+//!     foo = "bar"
+//!     baz = "nya"
+//! }
+//! 
+//! nested_str = "bar"
+//! "#;
+//! 
+//! let mut engine = Engine::from(cfg);
+//! let body = engine.parse().unwrap();
+//! 
+//! let mut engine2 = Engine::from(expected);
+//! let body2 = engine2.parse().unwrap();
+//! 
+//! println!("{body:?}");
+//! 
+//! assert_eq!(body, body2);
+//! ```
+
 
 use hcl::{
     eval::{Context, Evaluate},
@@ -189,77 +228,4 @@ impl<S: AsRef<str>> Engine<S> {
         }
         Ok(body)
     }
-}
-
-// a block wouuld equal to:
-/// ```hcl
-/// block "name" {
-///     foo = "bar"
-/// }
-///
-/// ```zzz
-///
-/// equals:
-/// ```hcl
-/// block = [
-/// {
-///  foo = "bar"
-/// }
-/// ]
-/// ```
-
-#[cfg(test)]
-#[test]
-fn test_eval_replacement() {
-    let cfg = r#"
-    // key = "value"
-    arr = ["hai", "bai"]
-    foo = arr[0]
-    obj = {
-        key = "value"
-    }
-    my_block "hai" {
-        foo = "bar"
-        baz = "nya"
-    }
-
-    nested_str = "${my_block.hai.foo}"
-    "#;
-
-    let expected = r#"
-    arr = ["hai", "bai"]
-    foo = "hai"
-    obj = {
-        key = "value"
-    }
-    my_block "hai" {
-        foo = "bar"
-        baz = "nya"
-    }
-
-    nested_str = "bar"
-    "#;
-
-    let mut engine = Engine::from(cfg);
-    let body = engine.parse().unwrap();
-
-    let mut engine2 = Engine::from(expected);
-    let body2 = engine2.parse().unwrap();
-
-    println!("{body:?}");
-
-    assert_eq!(body, body2);
-
-    // #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-    // struct Config {
-    //     key: String,
-    //     foo: String,
-    // }
-
-    // let
-
-    // let val: Config =
-    // println!("{:?}", val);
-
-    // assert_eq!(val, Config { key: "value".into(), foo: "value".into() });
 }
