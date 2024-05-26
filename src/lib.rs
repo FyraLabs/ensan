@@ -1,14 +1,9 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+//! # ensan
+//! Extended Evaluation Engine for `hcl-rs`.
+//!
+//!
+pub mod engine;
+pub(crate) mod errors;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use engine::Engine;
+pub use errors::Error;
