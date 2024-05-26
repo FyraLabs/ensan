@@ -2,8 +2,13 @@
 name = "ensan"
 version = "0.1.0"
 edition = "2021"
-
+authors = ["Pornpipat Popum <cappy@fyralabs.com>", "Mado <mado@fyralabs.com>"]
+categories = ["parsing", "parser-implementations"]
+keywords = ["hcl", "parser", "evaluator", "configuration"]
 description = "Extended HCL expression evaluator"
+repository = "https://github.com/FyraLabs/ensan"
+homepage = "https://fyralabs.com"
+documentation = "https://docs.rs/ensan"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

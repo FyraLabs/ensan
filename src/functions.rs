@@ -1,5 +1,15 @@
+//! # HCL functions
+//! 
+//! This module contains a re-implementations of the HCL2 built-in functions in Rust.
+//! 
+//! ensan aims to re-implement all of the built-in functions for HCL2 in Rust,
+//! allowing for a consistent experience between gohcl and ensan/hcl-rs.
+//! 
+//! The code is currently a work in progress and is not yet complete, see
+//! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
+
 use hcl::{
-    eval::{Context, Evaluate, FuncArgs, FuncDef, ParamType},
+    eval::FuncArgs,
     Value,
 };
 
@@ -11,11 +21,14 @@ type FnRes = Result<Value, String>;
 ///
 /// Returns: Value (Any)
 ///
-/// Example: yamldecode("key: value") => { key = "value" }
-fn yamldecode(args: FuncArgs) -> Result<Value, String> {
+/// Example: 
+/// ```hcl
+/// yamldecode("key: value") => { key = "value" }
+/// ```
+pub fn yamldecode(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
-    Ok(serde_yml::from_str(&args.to_string())
-        .map_err(|e| format!("Failed to deserialize YAML: {}", e))?)
+    serde_yml::from_str(&args.to_string())
+        .map_err(|e| format!("Failed to deserialize YAML: {}", e))
 }
 
 /// Deserializes HCL from a string to YAML
@@ -24,8 +37,11 @@ fn yamldecode(args: FuncArgs) -> Result<Value, String> {
 ///
 /// Returns: String
 ///
-/// Example: yamlencode({ key = "value" }) => "key: value"
-fn yamlencode(args: FuncArgs) -> Result<Value, String> {
+/// Example:
+/// ```hcl
+/// yamlencode({ key = "value" }) => "key: value"
+/// ```
+pub fn yamlencode(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
 
     Ok(Value::String(
@@ -40,13 +56,16 @@ fn yamlencode(args: FuncArgs) -> Result<Value, String> {
 ///
 /// Returns: String
 ///
-/// Example: env("HOME") => "/home/user"
-fn env(args: FuncArgs) -> Result<Value, String> {
+/// Example:
+/// ```hcl
+/// env("HOME") => "/home/user"
+/// ```
+pub fn env(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
     let key = args.to_string();
-    Ok(std::env::var(&key)
+    std::env::var(key)
         .map(Value::String)
-        .map_err(|e| format!("Failed to get environment variable: {}", e))?)
+        .map_err(|e| format!("Failed to get environment variable: {}", e))
 }
 
 /// Make all characters in a string lowercase
@@ -55,8 +74,11 @@ fn env(args: FuncArgs) -> Result<Value, String> {
 ///
 /// Returns: String
 ///
-/// Example: lower("HELLO") => "hello"
-fn lower(args: FuncArgs) -> FnRes {
+/// Example:
+/// ```hcl
+/// lower("HELLO") => "hello"
+/// ```
+pub fn lower(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
     Ok(Value::String(args.to_string().to_lowercase()))
 }
@@ -67,8 +89,11 @@ fn lower(args: FuncArgs) -> FnRes {
 ///
 /// Returns: String
 ///
-/// Example: upper("hello") => "HELLO"
-fn upper(args: FuncArgs) -> FnRes {
+/// Example:
+/// ```hcl
+/// upper("hello") => "HELLO"
+/// ```
+pub fn upper(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
     Ok(Value::String(args.to_string().to_uppercase()))
 }
@@ -79,8 +104,11 @@ fn upper(args: FuncArgs) -> FnRes {
 ///
 /// Returns: [String]
 ///
-/// Example: split(",", "a,b,c") => ["a", "b", "c"]
-fn split(args: FuncArgs) -> FnRes {
+/// Example:
+/// ```hcl
+/// split(",", "a,b,c") => ["a", "b", "c"]
+/// ```
+pub fn split(args: FuncArgs) -> FnRes {
     let mut args = args.iter();
     // If arg larger than 2, return error
     if args.len() != 2 {
@@ -109,8 +137,11 @@ fn split(args: FuncArgs) -> FnRes {
 ///
 /// Returns: String
 ///
-/// Example: join(",", ["a", "b", "c"]) => "a,b,c"
-fn join(args: FuncArgs) -> FnRes {
+/// Example:
+/// ```hcl
+/// join(",", ["a", "b", "c"]) => "a,b,c"
+/// ```
+pub fn join(args: FuncArgs) -> FnRes {
     let mut args = args.iter();
     // If arg larger than 2, return error
     if args.len() != 2 {
@@ -136,8 +167,11 @@ fn join(args: FuncArgs) -> FnRes {
 ///
 /// Returns: Number
 ///
-/// Example: strlen("hello") => 5
-fn strlen(args: FuncArgs) -> FnRes {
+/// Example:
+/// ```hcl
+/// strlen("hello") => 5
+/// ```
+pub fn strlen(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
     let len = args.to_string().len();
     Ok(len.into())

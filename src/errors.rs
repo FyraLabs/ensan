@@ -1,3 +1,4 @@
+//! Error types for ensan.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("HCL error: {0}")]

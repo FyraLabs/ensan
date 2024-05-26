@@ -1,42 +1,23 @@
-use hcl::eval::FuncDef;
-use hcl::eval::ParamType;
+//! # Ensan Engine
+//!
+//! This module contains the [`Engine`] implementation.
+//! You may use the engine to parse hcl-formatted strings.
+//!
+//! # Examples
+//! ```
+//! use crate::Engine;
+//! 
+
 use hcl::{
-    eval::{Context, Evaluate, FuncArgs},
+    eval::{Context, Evaluate},
     Value,
 };
 use std::borrow::BorrowMut;
-
 // #[hcl_func(ParamType::String)]
 // fn yamldecode(args: FuncArgs) -> Result<Value, String>
 
 // YAML de(ser)ialization functins
 type Res<T> = Result<T, crate::Error>;
-
-/// Serializes YAML from a string to HCL
-fn yamldecode(args: FuncArgs) -> Result<Value, String> {
-    let args = args.iter().next().ok_or("No arguments provided")?;
-    Ok(serde_yml::from_str(&args.to_string())
-        .map_err(|e| format!("Failed to deserialize YAML: {}", e))?)
-}
-
-/// Deserializes HCL from a string to YAML
-fn yamlencode(args: FuncArgs) -> Result<Value, String> {
-    let args = args.iter().next().ok_or("No arguments provided")?;
-
-    Ok(Value::String(
-        serde_yml::to_string(&args.to_string())
-            .map_err(|e| format!("Failed to serialize YAML: {}", e))?,
-    ))
-}
-
-/// Get value from environment variable
-fn env(args: FuncArgs) -> Result<Value, String> {
-    let args = args.iter().next().ok_or("No arguments provided")?;
-    let key = args.to_string();
-    Ok(std::env::var(&key)
-        .map(Value::String)
-        .map_err(|e| format!("Failed to get environment variable: {}", e))?)
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VarScope {
@@ -127,7 +108,7 @@ impl VarScopes {
             return;
         };
         if let Some(s) = self.0.iter_mut().find_map(|s| s.get_scope_mut(first)) {
-            s.set(&rest, key, value);
+            s.set(rest, key, value);
         } else {
             let mut new = VarScopes::default();
             new.set(rest, key, value); // TODO: optimizations
@@ -136,6 +117,7 @@ impl VarScopes {
     }
 }
 
+/// Engine for parsing hcl strings
 #[derive(Debug, Clone)]
 pub struct Engine<S: AsRef<str>> {
     pub content: S,
@@ -153,19 +135,20 @@ impl<S: AsRef<str>> From<S> for Engine<S> {
     }
 }
 impl<S: AsRef<str>> Engine<S> {
-    pub fn scope_refed(&self) -> Vec<&str> {
-        // TODO: might be a bit expensive to evaluate this multiple times
-        // but let's just hope the compiler optimizes this
-        self.scope.iter().map(String::as_str).collect()
-    }
-    pub fn init_ctx(&mut self, ctx: &mut Context) {
+    fn init_ctx(&self, ctx: &mut Context) {
+        use crate::functions;
         crate::add_hcl_fns!(ctx =>
-            yamldecode[String]
-            yamlencode[String]
-            env[String]
+            functions::yamlencode[String],
+            functions::yamldecode[String],
+            functions::env[String],
+            functions::lower[String],
+            functions::upper[String],
+            functions::split[String, String],
+            functions::join[String, Array(String)],
+            functions::strlen[String],
         );
     }
-    pub fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
+    fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
         let old_scope_len = self.scope.len();
         {
             self.scope.push(block.identifier.to_string());
@@ -180,17 +163,25 @@ impl<S: AsRef<str>> Engine<S> {
     }
 
     fn parse_struct(&mut self, structure: &mut hcl::Structure) -> Res<()> {
-        let ctx = self.varlist.to_hcl_ctx(&self.scope);
-        Ok(if let Some(attr) = structure.as_attribute_mut() {
+        let mut ctx = self.varlist.to_hcl_ctx(&self.scope);
+        self.init_ctx(&mut ctx);
+        if let Some(attr) = structure.as_attribute_mut() {
             let val = attr.expr.evaluate(&ctx)?;
             self.varlist
                 .set(&self.scope, attr.key.to_string(), val.clone());
             *attr.expr.borrow_mut() = val.into();
         } else if let Some(block) = structure.as_block_mut() {
             self.parse_block(block)?;
-        })
+        };
+        Ok(())
     }
 
+    /// Parse the string from hcl to an [`hcl::Body`] object.
+    ///
+    /// # Errors
+    /// The following scenarios would terminate the function immediately:
+    /// - failure to evalutate an hcl expression
+    /// - syntax error
     pub fn parse(&mut self) -> Res<hcl::Body> {
         let mut body = hcl::parse(self.content.as_ref())?;
         for structure in &mut body {
