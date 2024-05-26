@@ -1,17 +1,14 @@
 //! # HCL functions
-//! 
+//!
 //! This module contains a re-implementations of the HCL2 built-in functions in Rust.
-//! 
+//!
 //! ensan aims to re-implement all of the built-in functions for HCL2 in Rust,
 //! allowing for a consistent experience between gohcl and ensan/hcl-rs.
-//! 
+//!
 //! The code is currently a work in progress and is not yet complete, see
 //! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
 
-use hcl::{
-    eval::FuncArgs,
-    Value,
-};
+use hcl::{eval::FuncArgs, Value};
 
 type FnRes = Result<Value, String>;
 
@@ -21,14 +18,13 @@ type FnRes = Result<Value, String>;
 ///
 /// Returns: Value (Any)
 ///
-/// Example: 
+/// Example:
 /// ```hcl
 /// yamldecode("key: value") => { key = "value" }
 /// ```
 pub fn yamldecode(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
-    serde_yml::from_str(&args.to_string())
-        .map_err(|e| format!("Failed to deserialize YAML: {}", e))
+    serde_yml::from_str(&args.to_string()).map_err(|e| format!("Failed to deserialize YAML: {}", e))
 }
 
 /// Deserializes HCL from a string to YAML

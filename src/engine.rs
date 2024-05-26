@@ -17,10 +17,10 @@
 //!     foo = "bar"
 //!     baz = "nya"
 //! }
-//! 
+//!
 //! nested_str = "${my_block.hai.foo}"
 //! "#;
-//! 
+//!
 //! let expected = r#"
 //! arr = ["hai", "bai"]
 //! foo = "hai"
@@ -31,21 +31,20 @@
 //!     foo = "bar"
 //!     baz = "nya"
 //! }
-//! 
+//!
 //! nested_str = "bar"
 //! "#;
-//! 
+//!
 //! let mut engine = Engine::from(cfg);
 //! let body = engine.parse().unwrap();
-//! 
+//!
 //! let mut engine2 = Engine::from(expected);
 //! let body2 = engine2.parse().unwrap();
-//! 
+//!
 //! println!("{body:?}");
-//! 
+//!
 //! assert_eq!(body, body2);
 //! ```
-
 
 use hcl::{
     eval::{Context, Evaluate},
