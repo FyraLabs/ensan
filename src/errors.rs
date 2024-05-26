@@ -6,5 +6,4 @@ pub enum Error {
     HclEvals(#[from] hcl::eval::Errors),
     #[error("Hcl Eval error: {0}")]
     HclEval(#[from] hcl::eval::Error),
-
 }
