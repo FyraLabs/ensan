@@ -18,30 +18,26 @@ fn mutate_tokens(args: &[&Expr]) -> proc_macro2::TokenStream {
     if args.is_empty() {
         return quote::quote! {
             compile_error!("empty call syntax in #[ensan_fn(...)]");
-        }
-        .into();
+        };
     }
-    let [arg] = &args[..] else {
+    let [arg] = args else {
         return syn::Error::new(
             args[1].span(),
             "Call pattern has >=1 argument which is illegal",
         )
-        .into_compile_error()
-        .into();
+        .into_compile_error();
     };
 
     if let Expr::Path(epath) = arg {
-        return quote::quote! { ::hcl::eval::ParamType::#epath }.into();
+        return quote::quote! { ::hcl::eval::ParamType::#epath };
     }
     let Expr::Call(ecall) = arg else {
         return syn::Error::new(arg.span(), "not a call/path syntax")
-            .into_compile_error()
-            .into();
+            .into_compile_error();
     };
     let Expr::Path(t) = &*ecall.func else {
         return syn::Error::new(ecall.span(), "not a proper call ident")
-            .into_compile_error()
-            .into();
+            .into_compile_error();
     };
 
     let inner = mutate_tokens(&ecall.args.iter().collect::<Vec<_>>());
@@ -49,7 +45,6 @@ fn mutate_tokens(args: &[&Expr]) -> proc_macro2::TokenStream {
     quote::quote! {
         ::hcl::eval::ParamType::#t(::std::boxed::Box::new(#inner))
     }
-    .into()
 }
 
 /// Save the FuncDef into a global variable "ENSAN_INTERNAL_FNS"
@@ -78,7 +73,7 @@ pub fn ensan_internal_fn_mod(args: TokenStream, input: TokenStream) -> TokenStre
         let params = ensan_attr
             .args
             .iter()
-            .map(|param| mutate_tokens(&vec![param]));
+            .map(|param| mutate_tokens(&[param]));
         declare_func_stmts.push(quote::quote! {
             ctx.declare_func(stringify!(#fname), ::hcl::eval::FuncDef::new(#fname, [#(#params),*]));
         });
