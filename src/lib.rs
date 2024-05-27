@@ -26,3 +26,43 @@ pub mod macros;
 
 pub use engine::Engine;
 pub use errors::Error;
+
+/// Quickly evaluate an HCL file
+///
+/// Outputs a fully-evaluated `hcl::Body` object, which is `hcl-rs`'s representation of an HCL file.
+///
+/// This type also implements `serde::Deserialize`, so you can easily convert it to any format you want.
+///
+/// # Example
+///
+/// ```rust
+/// use hcl::Value;
+///
+/// let hcl = r#"
+/// var "foo" {
+///     bar = "baz"
+/// }
+/// test = var.foo.bar
+///
+/// "#;
+///
+/// let expected = r#"
+/// var "foo" {
+///     bar = "baz"
+/// }
+/// test = "baz"
+///
+/// "#;
+///
+/// let body = ensan::parse(hcl).unwrap();
+///
+/// let expected_body = hcl::from_str(expected).unwrap();
+///
+/// assert_eq!(body, expected_body);
+///
+/// ```
+///
+pub fn parse<S: AsRef<str> + std::default::Default>(s: S) -> Result<hcl::Body, Error> {
+    let mut engine = Engine::from(s);
+    engine.parse()
+}
