@@ -205,7 +205,11 @@ impl<S: AsRef<str> + std::default::Default> From<S> for Engine<S> {
 }
 impl<S: AsRef<str>> Engine<S> {
     fn init_ctx(ctx: &mut Context) {
-        crate::functions::init_ctx_with_ensan_internal_fns(ctx);
+        // We are going to import each function module here
+        // todo: Make even more robust thing here or we can separate loading of each module by feature flags
+        crate::functions::ensan_builtin_fns(ctx);
+        crate::functions::string_manipulation(ctx);
+        crate::functions::yaml(ctx);
     }
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
         let old_scope_len = self.scope.len();

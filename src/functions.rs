@@ -9,7 +9,9 @@
 //! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
 
 // TODO: Figure out why Value::String values include the quotes, and fix it or report it as a bug upstream!
+use hcl::{eval::FuncArgs, Value};
 
+type FnRes = Result<Value, String>;
 /// Unquote a string
 /// Workaround for a weird bug in hcl-rs (or maybe ensan itself?) where Value::String() includes the quotes too
 pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
@@ -20,13 +22,10 @@ pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
         s.to_string()
     }
 }
-#[ensan_proc_macro::ensan_internal_fn_mod(init_ctx_with_ensan_internal_fns)]
-pub mod ensan_internal_fns {
-    use hcl::{eval::FuncArgs, Value};
 
-    use super::unquote;
-
-    type FnRes = Result<Value, String>;
+#[ensan_proc_macro::ensan_internal_fn_mod(yaml)]
+pub mod yaml {
+    use super::*;
 
     /// Serializes YAML from a string to HCL
     ///
@@ -73,29 +72,11 @@ pub mod ensan_internal_fns {
 
         Ok(Value::String(ymlstring))
     }
+}
 
-    /// Get value from environment variable
-    ///
-    /// Accepts: String
-    ///
-    /// Returns: String
-    ///
-    // Doctests are ignored here because environment variables are system-specific
-    /// Example:
-    /// ```ignore
-    /// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
-    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap();
-    /// assert_eq!(eval, expected);
-    /// ```
-    #[ensan_fn(String)]
-    pub fn env(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
-        let key = unquote(args.to_string());
-        std::env::var(key)
-            .map(Value::String)
-            .map_err(|e| format!("Failed to get environment variable: {}", e))
-    }
-
+#[ensan_proc_macro::ensan_internal_fn_mod(string_manipulation)]
+pub mod string_manipulation {
+    use super::*;
     /// Make all characters in a string lowercase
     ///
     /// Accepts: String
@@ -222,5 +203,32 @@ pub mod ensan_internal_fns {
         let args = args.iter().next().ok_or("No arguments provided")?;
         let len = unquote(args.to_string()).len();
         Ok(len.into())
+    }
+}
+
+#[ensan_proc_macro::ensan_internal_fn_mod(ensan_builtin_fns)]
+pub mod ensan_internal_fns {
+    use super::*;
+
+    /// Get value from environment variable
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    // Doctests are ignored here because environment variables are system-specific
+    /// Example:
+    /// ```ignore
+    /// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn env(args: FuncArgs) -> FnRes {
+        let args = args.iter().next().ok_or("No arguments provided")?;
+        let key = unquote(args.to_string());
+        std::env::var(key)
+            .map(Value::String)
+            .map_err(|e| format!("Failed to get environment variable: {}", e))
     }
 }
