@@ -94,36 +94,55 @@ impl From<Vec<VarScope>> for VarScopes {
 impl VarScopes {
     #[must_use]
     #[inline]
+    #[deprecated(since = "0.1.2", note = "Please use `varscopes.0.iter_mut()` instead.")]
     pub fn as_vec_mut(&mut self) -> Vec<&mut VarScope> {
         self.0.iter_mut().collect()
     }
     #[must_use]
     #[inline]
+    #[deprecated(since = "0.1.2", note = "Please use `varscopes.0.iter()` instead.")]
     pub fn as_vec_ref(&self) -> Vec<&VarScope> {
         self.0.iter().collect()
     }
+    /// List all variables that reside in the given scope.
+    ///
+    /// This function is extremely inefficient as it recursively look up all the variables inside
+    /// the scope. If you pass in a scope of len 3, it'll call itself until it consumes all scopes
+    /// and performs a `flat_map` operation.
     #[must_use]
-    #[inline]
-    pub fn list_in_scope_mut(&mut self, scope: &[&str]) -> Vec<&mut VarScope> {
+    pub fn list_in_scope_mut<'a>(
+        &'a mut self,
+        scope: &'a [&str],
+    ) -> Box<dyn Iterator<Item = &'_ mut VarScope> + 'a> {
         let [first, remaining @ ..] = scope else {
-            return self.as_vec_mut();
+            return Box::new(self.0.iter_mut());
         };
-        self.0
-            .iter_mut()
-            .filter_map(|varscope| varscope.get_scope_mut(first))
-            .flat_map(|varscopes| varscopes.list_in_scope_mut(remaining))
-            .collect()
+        Box::new(
+            self.0
+                .iter_mut()
+                .filter_map(|varscope| varscope.get_scope_mut(first))
+                .flat_map(|varscopes| varscopes.list_in_scope_mut(remaining)),
+        )
     }
+    /// List all variables that reside in the given scope.
+    ///
+    /// This function is extremely inefficient as it recursively look up all the variables inside
+    /// the scope. If you pass in a scope of len 3, it'll call itself until it consumes all scopes
+    /// and performs a `flat_map` operation.
     #[must_use]
-    pub fn list_in_scope_ref(&self, scope: &[&str]) -> Vec<&VarScope> {
+    pub fn list_in_scope_ref<'a>(
+        &'a self,
+        scope: &'a [impl AsRef<str>],
+    ) -> Box<dyn Iterator<Item = &'_ VarScope> + 'a> {
         let [first, remaining @ ..] = scope else {
-            return self.as_vec_ref();
+            return Box::new(self.0.iter());
         };
-        self.0
-            .iter()
-            .filter_map(|varscope| varscope.get_scope_ref(first))
-            .flat_map(|varscopes| varscopes.list_in_scope_ref(remaining))
-            .collect()
+        Box::new(
+            self.0
+                .iter()
+                .filter_map(|varscope| varscope.get_scope_ref(first.as_ref()))
+                .flat_map(|varscopes| varscopes.list_in_scope_ref(remaining)),
+        )
     }
     #[must_use]
     pub fn to_hcl_value(&self) -> Value {
@@ -137,14 +156,18 @@ impl VarScopes {
     #[must_use]
     pub fn to_hcl_ctx(&self, scope: &[impl AsRef<str>]) -> Context {
         let mut ctx = Context::new();
-        self.list_in_scope_ref(&scope.iter().map(AsRef::as_ref).collect::<Vec<_>>())
-            .into_iter()
+        self.list_in_scope_ref(scope)
             .for_each(|varscopes| match varscopes {
                 VarScope::Var(k, v) => ctx.declare_var(k.to_string(), v.to_owned()),
                 VarScope::Scope(k, v) => ctx.declare_var(k.to_string(), v.to_hcl_value()),
             });
         ctx
     }
+    /// Create a new variable and set the value.
+    ///
+    /// This function assumes the variable *does NOT exist*.
+    /// However, if you call this twice with another `value`, the old value would be overwritten
+    /// during `to_hcl_value()` and `to_hcl_ctx()`.
     pub fn set(&mut self, scope: &[String], key: String, value: Value) {
         let [first, rest @ ..] = scope else {
             self.0.push(VarScope::Var(key, value));
@@ -161,7 +184,7 @@ impl VarScopes {
 }
 
 /// Engine for parsing hcl strings
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub struct Engine<S: AsRef<str>> {
     /// string hcl
@@ -172,12 +195,11 @@ pub struct Engine<S: AsRef<str>> {
     pub varlist: VarScopes,
 }
 
-impl<S: AsRef<str>> From<S> for Engine<S> {
+impl<S: AsRef<str> + std::default::Default> From<S> for Engine<S> {
     fn from(value: S) -> Self {
         Self {
             content: value,
-            scope: vec![],
-            varlist: VarScopes::default(),
+            ..Default::default()
         }
     }
 }
@@ -198,6 +220,7 @@ impl<S: AsRef<str>> Engine<S> {
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
         let old_scope_len = self.scope.len();
         {
+            self.scope.reserve(1 + block.labels.len());
             self.scope.push(block.identifier.to_string());
             self.scope
                 .extend(block.labels.iter().map(|bl| bl.to_owned().into_inner()));
@@ -216,7 +239,7 @@ impl<S: AsRef<str>> Engine<S> {
             let val = attr.expr.evaluate(&ctx)?;
             self.varlist
                 .set(&self.scope, attr.key.to_string(), val.clone());
-            *attr.expr.borrow_mut() = val.into();
+            *attr.expr.borrow_mut() = val.into(); // NOTE: this is where we need &mut structure
         } else if let Some(block) = structure.as_block_mut() {
             self.parse_block(block)?;
         };
