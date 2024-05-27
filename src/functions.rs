@@ -86,8 +86,11 @@ pub fn lower(args: FuncArgs) -> FnRes {
 /// Returns: String
 ///
 /// Example:
-/// ```hcl
-/// upper("hello") => "HELLO"
+/// ```
+/// let eval = ensan::parse("hi = upper(\"hello\")").unwrap();
+///
+/// let expected = ensan::parse("hi = \"HELLO\"").unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn upper(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
