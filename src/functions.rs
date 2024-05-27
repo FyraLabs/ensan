@@ -85,7 +85,7 @@ pub mod ensan_internal_fns {
     /// Example:
     /// ```ignore
     /// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
-    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap
+    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap();
     /// assert_eq!(eval, expected);
     /// ```
     #[ensan_fn(String)]
