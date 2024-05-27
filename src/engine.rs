@@ -205,17 +205,7 @@ impl<S: AsRef<str> + std::default::Default> From<S> for Engine<S> {
 }
 impl<S: AsRef<str>> Engine<S> {
     fn init_ctx(ctx: &mut Context) {
-        use crate::functions;
-        crate::add_hcl_fns!(ctx =>
-            functions::yamlencode[String],
-            functions::yamldecode[String],
-            functions::env[String],
-            functions::lower[String],
-            functions::upper[String],
-            functions::split[String, String],
-            functions::join[String, Array(String)],
-            functions::strlen[String],
-        );
+        crate::functions::init_ctx_with_ensan_internal_fns(ctx);
     }
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
         let old_scope_len = self.scope.len();

@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-use quote::ToTokens;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 
 struct EnsanFnAttrArgs {
@@ -13,6 +12,44 @@ impl Parse for EnsanFnAttrArgs {
             args: vars.into_iter().collect(),
         })
     }
+}
+
+fn mutate_tokens(args: &[&Expr]) -> proc_macro2::TokenStream {
+    if args.is_empty() {
+        return quote::quote! {
+            compile_error!("empty call syntax in #[ensan_fn(...)]");
+        }
+        .into();
+    }
+    let [arg] = &args[..] else {
+        return syn::Error::new(
+            args[1].span(),
+            "Call pattern has >=1 argument which is illegal",
+        )
+        .into_compile_error()
+        .into();
+    };
+
+    if let Expr::Path(epath) = arg {
+        return quote::quote! { ::hcl::eval::ParamType::#epath }.into();
+    }
+    let Expr::Call(ecall) = arg else {
+        return syn::Error::new(arg.span(), "not a call/path syntax")
+            .into_compile_error()
+            .into();
+    };
+    let Expr::Path(t) = &*ecall.func else {
+        return syn::Error::new(ecall.span(), "not a proper call ident")
+            .into_compile_error()
+            .into();
+    };
+
+    let inner = mutate_tokens(&ecall.args.iter().collect::<Vec<_>>());
+
+    quote::quote! {
+        ::hcl::eval::ParamType::#t(::std::boxed::Box::new(#inner))
+    }
+    .into()
 }
 
 /// Save the FuncDef into a global variable "ENSAN_INTERNAL_FNS"
@@ -38,124 +75,20 @@ pub fn ensan_internal_fn_mod(args: TokenStream, input: TokenStream) -> TokenStre
             .unwrap_or_else(syn::Error::into_compile_error)
             .into();
         let ensan_attr = syn::parse_macro_input!(ensan_attr as EnsanFnAttrArgs);
-        let mut params = ensan_attr.args;
-        for param in &mut params {
-            let syn::Expr::Call(ecall) = param else {
-                let syn::Expr::Path(_) = param else {
-                    return syn::Error::new(param.span(), "not a call/path syntax")
-                        .to_compile_error()
-                        .into();
-                };
-                continue;
-            };
-            {
-                // old code for testing?
-                // WARN: remove this
-                let mut args = ecall.args.iter_mut().collect::<Vec<_>>();
-                while !args.is_empty() {
-                    let newvar = args.as_mut_slice();
-                    let [one] = newvar else {
-                        return syn::Error::new(
-                            args[1].span(),
-                            "This call pattern has more than 1 arguments which is not allowed",
-                        )
-                        .to_compile_error()
-                        .into();
-                    };
-                    let rewrite = quote::quote! {
-                        Box::new(::hcl::eval::ParamType::#one)
-                    }
-                    .into();
-                    **one = syn::parse_macro_input!(rewrite as Expr);
-                    let syn::Expr::Call(ecall) = one else {
-                        unreachable!()
-                    };
-                    let inner = &mut ecall.args[0];
-                    let syn::Expr::Call(ecall) = inner else {
-                        let syn::Expr::Path(epath) = inner else {
-                            return syn::Error::new(param.span(), "not a call/path syntax")
-                                .to_compile_error()
-                                .into();
-                        };
-                        let rewrite = quote::quote! {
-                            ::hcl::eval::ParamType::#epath
-                        }
-                        .into_token_stream()
-                        .into();
-                        *epath = syn::parse_macro_input!(rewrite as syn::ExprPath);
-                        break;
-                    };
-                    args = ecall.args.iter_mut().collect::<Vec<_>>();
-                }
-            }
-            if ecall.args.len() != 1 {
-                return syn::Error::new(
-                    ecall.args[1].span(),
-                    "This call pattern has more than 1 arguments which is not allowed",
-                )
-                .to_compile_error()
-                .into();
-            }
-            let mut i = 0;
-            let mut args = ecall.args.iter_mut().collect::<Vec<_>>();
-            while let [rest @ .., one] = args.as_mut_slice() {
-                if rest.len() != i {
-                    return syn::Error::new(
-                        rest.last().span(),
-                        "This call pattern has more than 1 arguments which is not allowed",
-                    )
-                    .to_compile_error()
-                    .into();
-                }
-                i += 1;
-                let rewrite = quote::quote! {
-                    Box::new(::hcl::eval::ParamType::#one)
-                }
-                .into();
-                **one = syn::parse_macro_input!(rewrite as Expr);
-                let Expr::Call(ecall) = one else {
-                    unreachable!()
-                };
-                let inner = &mut ecall.args[0];
-                let Expr::Call(ecall) = inner else {
-                    let Expr::Path(epath) = inner else {
-                        return syn::Error::new(param.span(), "not a call/path syntax")
-                            .to_compile_error()
-                            .into();
-                    };
-                    let rewrite = quote::quote! {
-                        ::hcl::eval::ParamType::#epath
-                    }
-                    .into_token_stream()
-                    .into();
-                    *epath = syn::parse_macro_input!(rewrite as syn::ExprPath);
-                    break;
-                };
-                args = ecall.args.iter_mut().collect::<Vec<_>>();
-            }
-        }
-        // let params = params.iter().map(|param| {
-        //     let sstream = param.to_token_stream().to_string();
-        //     sstream
-        //         .replace('(', "(Box::new(::hcl::eval::ParamType::")
-        //         .replace(')', "))")
-        //         .to_token_stream()
-        // });
-        // let params = params.collect::<Vec<_>>();
-        // println!("{:?}", params);
+        let params = ensan_attr
+            .args
+            .iter()
+            .map(|param| mutate_tokens(&vec![param]));
         declare_func_stmts.push(quote::quote! {
-            ctx.declare_func(stringify!(#fname), ::hcl::eval::FuncDef::new(#fname, [#(::hcl::eval::ParamType::#params),*]));
+            ctx.declare_func(stringify!(#fname), ::hcl::eval::FuncDef::new(#fname, [#(#params),*]));
         });
     }
-    let out: TokenStream = quote::quote! {
+    quote::quote! {
         #input
         pub fn #new_fn_name(ctx: &mut ::hcl::eval::Context) {
             use #mod_name::*;
-            use ::hcl::eval::ParamType::*;
             #(#declare_func_stmts)*
         }
     }
-    .into();
-    println!("{}", out.to_string());
-    out
+    .into()
 }
