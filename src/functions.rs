@@ -7,9 +7,22 @@
 //!
 //! The code is currently a work in progress and is not yet complete, see
 //! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
+
+/// Unquote a string
+/// Workaround for a weird bug in hcl-rs (or maybe ensan itself?) where Value::String() includes the quotes too
+pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
+    let s = s.as_ref();
+    if s.starts_with('"') && s.ends_with('"') {
+        s[1..s.len() - 1].to_string()
+    } else {
+        s.to_string()
+    }
+}
 #[ensan_proc_macro::ensan_internal_fn_mod(init_ctx_with_ensan_internal_fns)]
 pub mod ensan_internal_fns {
     use hcl::{eval::FuncArgs, Value};
+
+    use super::unquote;
 
     type FnRes = Result<Value, String>;
 
@@ -28,13 +41,16 @@ pub mod ensan_internal_fns {
     #[ensan_fn(String)]
     pub fn yamldecode(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
+
+        let args = unquote(args.to_string());
+
         serde_yml::from_str(&args.to_string())
             .map_err(|e| format!("Failed to deserialize YAML: {}", e))
     }
 
-    /// Deserializes HCL from a string to YAML
+    /// Deserializes HCL from a object to YAML
     ///
-    /// Accepts: String
+    /// Accepts: Object
     ///
     /// Returns: String
     ///
@@ -44,14 +60,20 @@ pub mod ensan_internal_fns {
     /// let expected = ensan::parse(r#"hi = "key: value""#).unwrap();
     /// assert_eq!(eval, expected);
     /// ```
+    // todo: fix Object type
     #[ensan_fn(String)]
     pub fn yamlencode(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
+        println!("Args: {}", args);
 
-        Ok(Value::String(
-            serde_yml::to_string(&args.to_string())
-                .map_err(|e| format!("Failed to serialize YAML: {}", e))?,
-        ))
+        let args = unquote(args.to_string());
+
+        let ymlstring =
+            serde_yml::to_string(&args).map_err(|e| format!("Failed to serialize YAML: {}", e))?;
+
+        println!("YAML: {}", ymlstring);
+
+        Ok(Value::String(ymlstring))
     }
 
     /// Get value from environment variable
@@ -70,7 +92,7 @@ pub mod ensan_internal_fns {
     #[ensan_fn(String)]
     pub fn env(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-        let key = args.to_string();
+        let key = unquote(args.to_string());
         std::env::var(key)
             .map(Value::String)
             .map_err(|e| format!("Failed to get environment variable: {}", e))
@@ -84,14 +106,26 @@ pub mod ensan_internal_fns {
     ///
     /// Example:
     /// ```
-    /// let eval = ensan::parse(r#"hi = lower("HELLO")"#).unwrap();
-    /// let expected = ensan::parse(r#"hi = "hello""#).unwrap();
+    /// let eval = ensan::parse(r#"
+    /// hi = lower("HELLO")
+    /// "#).unwrap();
+    /// let expected = ensan::parse(r#"
+    /// hi = "hello"
+    /// "#).unwrap();
     /// assert_eq!(eval, expected);
     /// ```
     #[ensan_fn(String)]
     pub fn lower(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-        Ok(Value::String(args.to_string().to_lowercase()))
+
+        //? Why does the value include the quotes?
+        // This also applies to all Value::String returns!?
+
+        //? This might be a bug in hcl-rs
+
+        println!("String: {}", args);
+        println!("{:?}", args);
+        Ok(Value::String(unquote(args.to_string().to_lowercase())))
     }
 
     /// Make all characters in a string uppercase
@@ -109,7 +143,7 @@ pub mod ensan_internal_fns {
     #[ensan_fn(String)]
     pub fn upper(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-        Ok(Value::String(args.to_string().to_uppercase()))
+        Ok(Value::String(unquote(args.to_string().to_uppercase())))
     }
 
     /// Split a string into a list of string with a separator
@@ -133,12 +167,12 @@ pub mod ensan_internal_fns {
         }
         let sep = args.next().ok_or("No separator provided")?;
 
-        let sep = sep.to_string();
+        let sep = unquote(sep.to_string());
 
         // Second argument is the string to split
         let args = args.next().ok_or("No arguments provided")?;
 
-        let args = args.to_string();
+        let args = unquote(args.to_string());
 
         let splitted: Vec<Value> = args
             .split(&sep)
@@ -169,14 +203,14 @@ pub mod ensan_internal_fns {
         }
         let sep = args.next().ok_or("No separator provided")?;
 
-        let sep = sep.to_string();
+        let sep = unquote(sep.to_string());
 
         // Second argument is the string to split
         let args = args.next().ok_or("No arguments provided")?;
 
         let args = args.as_array().unwrap_or_else(|| unreachable!());
 
-        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = args.iter().map(|s| unquote(s.to_string())).collect();
 
         Ok(Value::String(args.join(&sep)))
     }
@@ -196,7 +230,7 @@ pub mod ensan_internal_fns {
     #[ensan_fn(String)]
     pub fn strlen(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-        let len = args.to_string().len();
+        let len = unquote(args.to_string()).len();
         Ok(len.into())
     }
 }
