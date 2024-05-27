@@ -6,6 +6,7 @@ version = 3
 name = "ensan"
 version = "0.1.1"
 dependencies = [
+ "ensan-proc-macro",
  "hcl-rs",
  "serde",
  "serde_yml",
