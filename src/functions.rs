@@ -8,6 +8,8 @@
 //! The code is currently a work in progress and is not yet complete, see
 //! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
 
+// TODO: Figure out why Value::String values include the quotes, and fix it or report it as a bug upstream!
+
 /// Unquote a string
 /// Workaround for a weird bug in hcl-rs (or maybe ensan itself?) where Value::String() includes the quotes too
 pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
@@ -20,7 +22,10 @@ pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
 }
 #[ensan_proc_macro::ensan_internal_fn_mod(init_ctx_with_ensan_internal_fns)]
 pub mod ensan_internal_fns {
-    use hcl::{eval::FuncArgs, Value};
+    use hcl::{
+        eval::FuncArgs,
+        Value,
+    };
 
     use super::unquote;
 
@@ -49,7 +54,7 @@ pub mod ensan_internal_fns {
 
     /// Deserializes HCL from a object to YAML
     ///
-    /// Accepts: Object
+    /// Accepts: Any
     ///
     /// Returns: String
     ///
@@ -60,17 +65,14 @@ pub mod ensan_internal_fns {
     /// assert_eq!(eval, expected);
     /// ```
     // todo: fix Object type
-    #[ensan_fn(String)]
+    #[ensan_fn(Any)]
     pub fn yamlencode(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-        println!("Args: {}", args);
 
-        let args = unquote(args.to_string());
-
-        let ymlstring =
-            serde_yml::to_string(&args).map_err(|e| format!("Failed to serialize YAML: {}", e))?;
-
-        println!("YAML: {}", ymlstring);
+        let ymlstring = serde_yml::to_string(args)
+            .map_err(|e| format!("Failed to serialize YAML: {}", e))?
+            .trim()
+            .to_string();
 
         Ok(Value::String(ymlstring))
     }
@@ -116,14 +118,6 @@ pub mod ensan_internal_fns {
     #[ensan_fn(String)]
     pub fn lower(args: FuncArgs) -> FnRes {
         let args = args.iter().next().ok_or("No arguments provided")?;
-
-        //? Why does the value include the quotes?
-        // This also applies to all Value::String returns!?
-
-        //? This might be a bug in hcl-rs
-
-        println!("String: {}", args);
-        println!("{:?}", args);
         Ok(Value::String(unquote(args.to_string().to_lowercase())))
     }
 
