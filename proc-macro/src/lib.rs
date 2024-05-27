@@ -32,12 +32,10 @@ fn mutate_tokens(args: &[&Expr]) -> proc_macro2::TokenStream {
         return quote::quote! { ::hcl::eval::ParamType::#epath };
     }
     let Expr::Call(ecall) = arg else {
-        return syn::Error::new(arg.span(), "not a call/path syntax")
-            .into_compile_error();
+        return syn::Error::new(arg.span(), "not a call/path syntax").into_compile_error();
     };
     let Expr::Path(t) = &*ecall.func else {
-        return syn::Error::new(ecall.span(), "not a proper call ident")
-            .into_compile_error();
+        return syn::Error::new(ecall.span(), "not a proper call ident").into_compile_error();
     };
 
     let inner = mutate_tokens(&ecall.args.iter().collect::<Vec<_>>());
@@ -70,10 +68,7 @@ pub fn ensan_internal_fn_mod(args: TokenStream, input: TokenStream) -> TokenStre
             .unwrap_or_else(syn::Error::into_compile_error)
             .into();
         let ensan_attr = syn::parse_macro_input!(ensan_attr as EnsanFnAttrArgs);
-        let params = ensan_attr
-            .args
-            .iter()
-            .map(|param| mutate_tokens(&[param]));
+        let params = ensan_attr.args.iter().map(|param| mutate_tokens(&[param]));
         declare_func_stmts.push(quote::quote! {
             ctx.declare_func(stringify!(#fname), ::hcl::eval::FuncDef::new(#fname, [#(#params),*]));
         });

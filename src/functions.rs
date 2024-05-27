@@ -22,10 +22,7 @@ pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
 }
 #[ensan_proc_macro::ensan_internal_fn_mod(init_ctx_with_ensan_internal_fns)]
 pub mod ensan_internal_fns {
-    use hcl::{
-        eval::FuncArgs,
-        Value,
-    };
+    use hcl::{eval::FuncArgs, Value};
 
     use super::unquote;
 
