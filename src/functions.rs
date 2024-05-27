@@ -19,8 +19,10 @@ type FnRes = Result<Value, String>;
 /// Returns: Value (Any)
 ///
 /// Example:
-/// ```hcl
-/// yamldecode("key: value") => { key = "value" }
+/// ```
+/// let eval = ensan::parse(r#"hi = yamldecode("key: value")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = { key = "value" }"#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn yamldecode(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
@@ -34,8 +36,10 @@ pub fn yamldecode(args: FuncArgs) -> FnRes {
 /// Returns: String
 ///
 /// Example:
-/// ```hcl
-/// yamlencode({ key = "value" }) => "key: value"
+/// ```
+/// let eval = ensan::parse(r#"hi = yamlencode({ key = "value" })"#).unwrap();
+/// let expected = ensan::parse(r#"hi = "key: value""#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn yamlencode(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
@@ -52,9 +56,12 @@ pub fn yamlencode(args: FuncArgs) -> FnRes {
 ///
 /// Returns: String
 ///
+// Doctests are ignored here because environment variables are system-specific
 /// Example:
-/// ```hcl
-/// env("HOME") => "/home/user"
+/// ```ignore
+/// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap
+/// assert_eq!(eval, expected);
 /// ```
 pub fn env(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
@@ -71,8 +78,10 @@ pub fn env(args: FuncArgs) -> FnRes {
 /// Returns: String
 ///
 /// Example:
-/// ```hcl
-/// lower("HELLO") => "hello"
+/// ```
+/// let eval = ensan::parse(r#"hi = lower("HELLO")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = "hello""#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn lower(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
@@ -87,9 +96,8 @@ pub fn lower(args: FuncArgs) -> FnRes {
 ///
 /// Example:
 /// ```
-/// let eval = ensan::parse("hi = upper(\"hello\")").unwrap();
-///
-/// let expected = ensan::parse("hi = \"HELLO\"").unwrap();
+/// let eval = ensan::parse(r#"hi = upper("hello")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = "HELLO""#).unwrap();
 /// assert_eq!(eval, expected);
 /// ```
 pub fn upper(args: FuncArgs) -> FnRes {
@@ -104,8 +112,10 @@ pub fn upper(args: FuncArgs) -> FnRes {
 /// Returns: [String]
 ///
 /// Example:
-/// ```hcl
-/// split(",", "a,b,c") => ["a", "b", "c"]
+/// ```
+/// let eval = ensan::parse(r#"hi = split(",", "a,b,c")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = ["a", "b", "c"]"#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn split(args: FuncArgs) -> FnRes {
     let mut args = args.iter();
@@ -137,8 +147,10 @@ pub fn split(args: FuncArgs) -> FnRes {
 /// Returns: String
 ///
 /// Example:
-/// ```hcl
-/// join(",", ["a", "b", "c"]) => "a,b,c"
+/// ```
+/// let eval = ensan::parse(r#"hi = join(",", ["a", "b", "c"])"#).unwrap();
+/// let expected = ensan::parse(r#"hi = "a,b,c""#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn join(args: FuncArgs) -> FnRes {
     let mut args = args.iter();
@@ -167,8 +179,10 @@ pub fn join(args: FuncArgs) -> FnRes {
 /// Returns: Number
 ///
 /// Example:
-/// ```hcl
-/// strlen("hello") => 5
+/// ```
+/// let eval = ensan::parse(r#"hi = strlen("hello")"#).unwrap();
+/// let expected = ensan::parse(r#"hi = 5"#).unwrap();
+/// assert_eq!(eval, expected);
 /// ```
 pub fn strlen(args: FuncArgs) -> FnRes {
     let args = args.iter().next().ok_or("No arguments provided")?;
