@@ -44,7 +44,7 @@ pub mod ensan_internal_fns {
 
         let args = unquote(args.to_string());
 
-        serde_yml::from_str(&args.to_string())
+        serde_yml::from_str(&args)
             .map_err(|e| format!("Failed to deserialize YAML: {}", e))
     }
 
