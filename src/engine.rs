@@ -264,6 +264,21 @@ impl Engine<'_> {
 
     /// Parse the string from hcl to an [`hcl::Body`] object.
     ///
+    /// # README
+    ///
+    /// ## Differences between this and [`ensan::parse()`]
+    /// - if you use the same engine to parse multiple times, the items from the previous strings
+    /// would still be accessible in the following parses:
+    /// ```
+    /// let en = ensan::Engine::new();
+    /// let _ = en.parse(r#"foo = "bar""#).unwrap();
+    /// let _ = en.parse(r#"another = foo"#).unwrap(); // ok!
+    /// en.clean_up(); // remove previous stuff
+    /// let _ = en.parse(r#"again = foo"#).unwrap_err(); // nope
+    /// ```
+    /// - if you want to parse multiple different strings with the same set of hcl functions, it
+    /// is better to use the same `Engine` and just [`clean_up()`] every time after pasing.
+    ///
     /// # Errors
     /// The following scenarios would terminate the function immediately:
     /// - failure to evalutate an hcl expression
