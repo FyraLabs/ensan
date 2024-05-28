@@ -21,9 +21,10 @@ macro_rules! must_let {
     };
 }
 
-#[ensan_proc_macro::ensan_internal_fn_mod(yaml)]
-pub mod yaml {
-    use super::{FnRes, FuncArgs, Value};
+#[ensan_proc_macro::ensan_internal_fn_mod(encoding)]
+pub mod encoding {
+    use super::*;
+    use base64::prelude::*;
 
     /// Serializes YAML from a string to HCL
     ///
@@ -75,13 +76,106 @@ pub mod yaml {
 
         Ok(Value::String(ymlstring))
     }
+
+    /// Deserializes JSON from a string to HCL
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: Value (Any)
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = jsondecode("{\"key\": \"value\"}")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = { key = "value" }"#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn jsondecode(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(arg)] = &args[..]);
+
+        serde_json::from_str(arg).map_err(|e| format!("Failed to deserialize JSON: {e}"))
+    }
+
+    #[test]
+    fn test_jsondecode() {
+        crate::parse(r#"hi = jsondecode()"#).expect_err("jsondecode() runs without args");
+        crate::parse(r#"hi = jsondecode(1)"#).expect_err("jsondecode() runs with wrong-type args");
+    }
+
+    /// Serializes HCL from an object to JSON
+    ///
+    /// Accepts: Any
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = jsonencode({ key = "value" })"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "{\"key\":\"value\"}""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(Any)]
+    pub fn jsonencode(args: FuncArgs) -> FnRes {
+        must_let!([arg] = &args[..]);
+
+        let jsonstring = serde_json::to_string(arg)
+            .map_err(|e| format!("Failed to serialize JSON: {e}"))?
+            .trim()
+            .to_string();
+        Ok(Value::String(jsonstring))
+    }
+
+    /// Encode a string to base64
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = base64encode("hello")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "aGVsbG8=""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn base64encode(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(arg)] = &args[..]);
+
+        let encoded = BASE64_STANDARD.encode(arg.as_bytes());
+        Ok(Value::String(encoded))
+    }
+
+    /// Decode a base64 string to plain text
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = base64decode("aGVsbG8=")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "hello""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn base64decode(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(arg)] = &args[..]);
+
+        let decoded = BASE64_STANDARD
+            .decode(arg.as_bytes())
+            .map_err(|e| format!("Failed to decode base64: {e}"))?;
+        let decoded_str = String::from_utf8(decoded)
+            .map_err(|e| format!("Failed to convert decoded bytes to string: {e}"))?;
+        Ok(Value::String(decoded_str))
+    }
 }
 
 #[ensan_proc_macro::ensan_internal_fn_mod(string_manipulation)]
+/// This module contains string manipulation functions.
 pub mod string_manipulation {
+    use super::*;
     use itertools::Itertools;
 
-    use super::{FnRes, FuncArgs, Value};
     /// Make all characters in a string lowercase
     ///
     /// Accepts: String
@@ -124,7 +218,7 @@ pub mod string_manipulation {
         Ok(Value::String(arg.to_uppercase()))
     }
 
-    /// Split a string into a list of string with a separator
+    /// Split a string into a list of strings with a separator
     ///
     /// Accepts: String, String
     ///
@@ -186,6 +280,43 @@ pub mod string_manipulation {
         must_let!([Value::String(s)] = &args[..]);
         Ok(s.len().into())
     }
+
+    /// Trim leading and trailing whitespace from a string
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = trimspace("  hello  ")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "hello""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn trimspace(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(s)] = &args[..]);
+        Ok(s.trim().into())
+    }
+
+    /// Reverse a string
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    /// ```
+    /// let eval = ensan::parse(r#"hi = strrev("hello")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "olleh""#).unwrap();
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn strrev(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(s)] = &args[..]);
+        let reversed: String = s.chars().rev().collect();
+        Ok(Value::String(reversed))
+    }
 }
 
 #[ensan_proc_macro::ensan_internal_fn_mod(ensan_builtin_fns)]
@@ -198,11 +329,12 @@ pub mod ensan_internal_fns {
     ///
     /// Returns: String
     ///
-    // Doctests are ignored here because environment variables are system-specific
     /// Example:
-    /// ```ignore
-    /// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
-    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap();
+    /// ```
+    /// std::env::set_var("FOO", "bar"); // set environment variable
+    ///
+    /// let eval = ensan::parse(r#"hi = env("FOO")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "bar""#).unwrap();
     /// assert_eq!(eval, expected);
     /// ```
     #[ensan_fn(String)]
@@ -211,5 +343,220 @@ pub mod ensan_internal_fns {
         Ok(std::env::var(key)
             .map_err(|e| format!("Failed to get environment variable: {e}"))?
             .into())
+    }
+}
+
+#[ensan_proc_macro::ensan_internal_fn_mod(hashing)]
+pub mod hashing {
+    use super::*;
+
+    // todo: add bcrypt function once we figure out how to do optional arguments
+
+    /// Hash a string using the MD5 algorithm
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Note: MD5 is considered cryptographically broken and unsuitable for further use.
+    /// This function is provided for compatibility with existing systems.
+    ///
+    /// Example:
+    /// ```rust
+    /// use md5::{Digest, Md5};
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let mut hasher = Md5::new();
+    /// hasher.update(ex_str);
+    /// let hash_result = format!("{:x}", hasher.finalize());
+    ///
+    /// let hcl_str = format!(r#"hi = md5("{}")"#, ex_str);
+    ///
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    ///
+    /// ```
+    ///
+    #[ensan_fn(String)]
+    pub fn md5(args: FuncArgs) -> FnRes {
+        use md5::{Digest, Md5};
+        must_let!([Value::String(s)] = &args[..]);
+        let mut hasher = Md5::new();
+        hasher.update(s);
+        Ok(format!("{:x}", hasher.finalize()).into())
+    }
+
+    /// Hash a string using the SHA1 algorithm
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Note: SHA1 is considered cryptographically broken and unsuitable for further use.
+    /// This function is provided for compatibility with existing systems.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use sha1::{Sha1, Digest};
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let mut hasher = Sha1::new();
+    /// hasher.update(ex_str);
+    /// let hash_result = format!("{:x}", hasher.finalize());
+    ///
+    /// let hcl_str = format!(r#"hi = sha1("{}")"#, ex_str);
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn sha1(args: FuncArgs) -> FnRes {
+        use sha1::{Digest, Sha1};
+        must_let!([Value::String(s)] = &args[..]);
+        let mut hasher = Sha1::new();
+        hasher.update(s.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()).into())
+    }
+
+    /// Hash a string using the SHA256 algorithm
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Note: SHA256 is a widely used cryptographic hash function.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use sha2::{Sha256, Digest};
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let mut hasher = Sha256::new();
+    /// hasher.update(ex_str);
+    /// let hash_result = format!("{:x}", hasher.finalize());
+    ///
+    /// let hcl_str = format!(r#"hi = sha256("{}")"#, ex_str);
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn sha256(args: FuncArgs) -> FnRes {
+        use sha2::{Digest, Sha256};
+        must_let!([Value::String(s)] = &args[..]);
+        let mut hasher = Sha256::new();
+        hasher.update(s.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()).into())
+    }
+
+    /// Hash a string using the SHA512 algorithm
+    ///
+    /// Accepts: String
+    ///
+    /// Returns: String
+    ///
+    /// Note: SHA512 is a widely used cryptographic hash function.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use sha2::{Sha512, Digest};
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let mut hasher = Sha512::new();
+    /// hasher.update(ex_str);
+    /// let hash_result = format!("{:x}", hasher.finalize());
+    ///
+    /// let hcl_str = format!(r#"hi = sha512("{}")"#, ex_str);
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String)]
+    pub fn sha512(args: FuncArgs) -> FnRes {
+        use sha2::{Digest, Sha512};
+        must_let!([Value::String(s)] = &args[..]);
+        let mut hasher = Sha512::new();
+        hasher.update(s.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()).into())
+    }
+    // todo: make Nullable work when only one argument is passed?
+    /// Hash a string using bcrypt
+    ///
+    /// Accepts: String, Nullable(Number)
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    ///
+    /// ```ignore // Test is ignored here because bcrypt is not deterministic, so we can't really compare the output
+    /// use bcrypt::hash;
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let hash_result = hash(ex_str, 10).unwrap();
+    ///
+    /// let hcl_str = format!(r#"hi = bcrypt("{}", 10)"#, ex_str);
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String, Nullable(Number))]
+    pub fn bcrypt(args: FuncArgs) -> FnRes {
+        use bcrypt::hash;
+        // Ok, time to do this the old-fashioned way
+
+        must_let!([Value::String(s), cost] = &args[..]);
+        let cost = cost.as_u64().unwrap_or(10).try_into().unwrap();
+        Ok(hash(s, cost)
+            .map_err(|e| format!("Failed to hash string with bcrypt: {e}"))?
+            .into())
+    }
+}
+
+#[ensan_proc_macro::ensan_internal_fn_mod(uuid)]
+pub mod uuid {
+    use super::*;
+    use ::uuid::Uuid;
+
+    /// Generate a random UUID
+    ///
+    /// Accepts: None
+    ///
+    /// Returns: String
+    ///
+    #[ensan_fn()]
+    pub fn uuidv4(_args: FuncArgs) -> FnRes {
+        Ok(uuid::Uuid::new_v4().to_string().into())
+    }
+
+    /// Generate a UUIDv5 from a namespace and a name
+    ///
+    /// Accepts: String, String
+    ///
+    /// Returns: String
+    ///
+    #[ensan_fn(String, String)]
+    pub fn uuidv5(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(ns), Value::String(name)] = &args[..]);
+        let ns = Uuid::parse_str(ns).map_err(|e| format!("Failed to parse UUID: {e}"))?;
+        Ok(Uuid::new_v5(&ns, name.as_bytes()).to_string().into())
     }
 }

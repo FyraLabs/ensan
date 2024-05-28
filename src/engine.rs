@@ -211,7 +211,8 @@ impl Engine<'_> {
         // todo: Make even more robust thing here or we can separate loading of each module by feature flags
         crate::functions::ensan_builtin_fns(ctx);
         crate::functions::string_manipulation(ctx);
-        crate::functions::yaml(ctx);
+        crate::functions::encoding(ctx);
+        crate::functions::hashing(ctx);
     }
 
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {

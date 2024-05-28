@@ -31,12 +31,13 @@ fn ref_attr_nblks_3_lbls() {
         r#"
         blk "one" "two" "three" {
             bar = "baz"
-            another = bar
             again "four" "five" "six" {
                 foo = "?"
                 hai = "bai"
             }
             hai = again.four.five.six.hai
+            nya "idk" "anymore" {}
+            another = bar
         }
         wow = blk.one.two.three.again.four.five.six.foo
         "#,
