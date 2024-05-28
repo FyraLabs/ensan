@@ -195,11 +195,12 @@ pub mod ensan_internal_fns {
     ///
     /// Returns: String
     ///
-    // Doctests are ignored here because environment variables are system-specific
     /// Example:
-    /// ```ignore
-    /// let eval = ensan::parse(r#"hi = env("HOME")"#).unwrap();
-    /// let expected = ensan::parse(r#"hi = "/home/user""#).unwrap();
+    /// ```
+    /// std::env::set_var("FOO", "bar"); // set environment variable
+    /// 
+    /// let eval = ensan::parse(r#"hi = env("FOO")"#).unwrap();
+    /// let expected = ensan::parse(r#"hi = "bar""#).unwrap();
     /// assert_eq!(eval, expected);
     /// ```
     #[ensan_fn(String)]
