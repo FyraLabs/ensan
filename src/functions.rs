@@ -524,7 +524,8 @@ pub mod hashing {
         // Ok, time to do this the old-fashioned way
 
         must_let!([Value::String(s), cost] = &args[..]);
-        let cost = cost.as_u64().unwrap_or(10).try_into().unwrap();
+        let cost = (cost.as_u64().unwrap_or(10).try_into())
+            .map_err(|e| format!("Cannot turn u64 → u32: {e}"))?;
         Ok(hash(s, cost)
             .map_err(|e| format!("Failed to hash string with bcrypt: {e}"))?
             .into())
