@@ -546,16 +546,15 @@ pub mod uuid {
     }
 
     /// Generate a UUIDv5 from a namespace and a name
-    /// 
+    ///
     /// Accepts: String, String
-    /// 
+    ///
     /// Returns: String
-    /// 
+    ///
     #[ensan_fn(String, String)]
     pub fn uuidv5(args: FuncArgs) -> FnRes {
         must_let!([Value::String(ns), Value::String(name)] = &args[..]);
         let ns = Uuid::parse_str(ns).map_err(|e| format!("Failed to parse UUID: {e}"))?;
         Ok(Uuid::new_v5(&ns, name.as_bytes()).to_string().into())
     }
-
 }
