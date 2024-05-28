@@ -1,7 +1,7 @@
 # ensan
 
-![Crates.io Version](https://img.shields.io/crates/v/ensan)
-![Crates.io License](https://img.shields.io/crates/l/ensan)
+[![Crates.io Version](https://img.shields.io/crates/v/ensan)](https://crates.io/crates/ensan)
+[![Crates.io License](https://img.shields.io/crates/l/ensan)](https://crates.io/crates/ensan)
 
 > A corrosive expression engine for a corroded language.
 
