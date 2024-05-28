@@ -270,7 +270,7 @@ impl Engine<'_> {
     /// - if you use the same engine to parse multiple times, the items from the previous strings
     /// would still be accessible in the following parses:
     /// ```
-    /// let en = ensan::Engine::new();
+    /// let mut en = ensan::Engine::new();
     /// let _ = en.parse(r#"foo = "bar""#).unwrap();
     /// let _ = en.parse(r#"another = foo"#).unwrap(); // ok!
     /// en.clean_up(); // remove previous stuff
@@ -287,6 +287,7 @@ impl Engine<'_> {
     pub fn parse(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
         let mut body = hcl::parse(content.as_ref())?;
         let mut ctx = self.ctx_init.clone();
+        self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
         for structure in &mut body {
             self.parse_struct(structure, &mut ctx)?;
         }
