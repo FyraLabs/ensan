@@ -39,7 +39,7 @@ pub mod yaml {
     pub fn yamldecode(args: FuncArgs) -> FnRes {
         must_let!([Value::String(arg)] = &args[..]);
 
-        serde_yml::from_str(&arg).map_err(|e| format!("Failed to deserialize YAML: {e}"))
+        serde_yml::from_str(arg).map_err(|e| format!("Failed to deserialize YAML: {e}"))
     }
 
     #[test]
@@ -138,7 +138,7 @@ pub mod string_manipulation {
         must_let!([Value::String(sep), Value::String(args)] = &args[..]);
 
         Ok(Value::Array(
-            args.split(&*sep)
+            args.split(sep)
                 .map(ToString::to_string)
                 .map(Value::String)
                 .collect(),
@@ -162,7 +162,7 @@ pub mod string_manipulation {
         must_let!([Value::String(sep), Value::Array(args)] = &args[..]);
 
         Ok(Value::String(
-            args.iter().filter_map(Value::as_str).join(&sep),
+            args.iter().filter_map(Value::as_str).join(sep),
         ))
     }
 
