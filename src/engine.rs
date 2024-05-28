@@ -35,11 +35,9 @@
 //! nested_str = "bar"
 //! "#;
 //!
-//! let mut engine = Engine::from(cfg);
-//! let body = engine.parse().unwrap();
-//!
-//! let mut engine2 = Engine::from(expected);
-//! let body2 = engine2.parse().unwrap();
+//! let mut engine = Engine::new();
+//! let body = engine.parse(cfg).unwrap();
+//! let body2 = engine.parse(expected).unwrap();
 //!
 //! println!("{body:?}");
 //!

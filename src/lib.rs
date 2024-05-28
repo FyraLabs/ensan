@@ -61,7 +61,6 @@ pub use errors::Error;
 ///
 /// ```
 ///
-pub fn parse<S: AsRef<str> + std::default::Default>(s: S) -> Result<hcl::Body, Error> {
-    let mut engine = Engine::new();
-    engine.parse(s)
+pub fn parse(s: impl AsRef<str>) -> Result<hcl::Body, Error> {
+    Engine::new().parse(s)
 }
