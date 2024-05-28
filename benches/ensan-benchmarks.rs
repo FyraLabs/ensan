@@ -1,0 +1,33 @@
+use criterion::{criterion_group, criterion_main, Criterion};
+
+macro_rules! bench_group {
+    ($group:ident => $($f:ident)*) => {
+        fn $group(c: &mut Criterion) { $(
+            c.bench_function(stringify!($f), |b| b.iter(|| $f()));
+        )* }
+    }
+}
+
+fn ref_attr_in_blk() {
+    let _ = ensan::parse(
+        r#"
+        var "foo" { bar = "baz" }
+        test = var.foo.bar
+    "#,
+    )
+    .unwrap();
+}
+fn ref_attr_in_10_blks() {
+    let _ = ensan::parse(
+        r#"
+        b1 = { b2 = { b3 = { b4 = { b5 = { b6 = { b7 = { b8 = { b9 = { b10 = { bar = "baz" }}}}}}}}}}
+        test = b1.b2.b3.b4.b5.b6.b7.b8.b9.b10.bar
+    "#,
+    )
+    .unwrap();
+}
+
+bench_group!(criterion_refs => ref_attr_in_blk ref_attr_in_10_blks);
+
+criterion_group!(engine_benches, criterion_refs);
+criterion_main!(engine_benches);

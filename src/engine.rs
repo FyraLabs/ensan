@@ -92,18 +92,6 @@ impl From<Vec<VarScope>> for VarScopes {
 }
 
 impl VarScopes {
-    #[must_use]
-    #[inline]
-    #[deprecated(since = "0.1.2", note = "Please use `varscopes.0.iter_mut()` instead.")]
-    pub fn as_vec_mut(&mut self) -> Vec<&mut VarScope> {
-        self.0.iter_mut().collect()
-    }
-    #[must_use]
-    #[inline]
-    #[deprecated(since = "0.1.2", note = "Please use `varscopes.0.iter()` instead.")]
-    pub fn as_vec_ref(&self) -> Vec<&VarScope> {
-        self.0.iter().collect()
-    }
     /// List all variables that reside in the given scope.
     ///
     /// This function is extremely inefficient as it recursively look up all the variables inside
@@ -153,14 +141,17 @@ impl VarScopes {
         });
         Value::Object(indexmap)
     }
-    #[must_use]
-    pub fn to_hcl_ctx(&self, scope: &[impl AsRef<str>]) -> Context {
-        let mut ctx = Context::new();
+    pub fn populate_hcl_ctx(&self, ctx: &mut Context, scope: &[impl AsRef<str>]) {
         self.list_in_scope_ref(scope)
             .for_each(|varscopes| match varscopes {
                 VarScope::Var(k, v) => ctx.declare_var(k.to_string(), v.to_owned()),
                 VarScope::Scope(k, v) => ctx.declare_var(k.to_string(), v.to_hcl_value()),
             });
+    }
+    #[must_use]
+    pub fn to_hcl_ctx(&self, scope: &[impl AsRef<str>]) -> Context {
+        let mut ctx = Context::new();
+        self.populate_hcl_ctx(&mut ctx, scope);
         ctx
     }
     /// Create a new variable and set the value.
@@ -186,32 +177,36 @@ impl VarScopes {
 /// Engine for parsing hcl strings
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
-pub struct Engine<S: AsRef<str>> {
-    /// string hcl
-    pub content: S,
+pub struct Engine<'a> {
+    pub ctx_init: Context<'a>,
     /// (variable) scope during parsing
     pub scope: Vec<String>,
     /// variable list
     pub varlist: VarScopes,
 }
 
-impl<S: AsRef<str> + std::default::Default> From<S> for Engine<S> {
-    fn from(value: S) -> Self {
+impl Engine<'_> {
+    #[must_use]
+    pub fn new() -> Self {
+        let mut ctx_init = Context::new();
+        Self::init_ctx(&mut ctx_init);
         Self {
-            content: value,
+            ctx_init,
             ..Default::default()
         }
     }
-}
-impl<S: AsRef<str>> Engine<S> {
+    // NOTE: since 0.1.2 we are only calling this once then we just clone `self.ctx_init`
+    // everytime we want a new context. This is because `ctx.declare_func()` is actually pretty
+    // expensive. According to my benchmarks using flamegraph, during execution of
+    // [`Self::parse_struct()`], 46% of the time it would be inside `init_ctx()`.
     fn init_ctx(ctx: &mut Context) {
         // We are going to import each function module here
         // todo: Make even more robust thing here or we can separate loading of each module by feature flags
-        // TODO: make this list customizable
         crate::functions::ensan_builtin_fns(ctx);
         crate::functions::string_manipulation(ctx);
         crate::functions::yaml(ctx);
     }
+
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
         let old_scope_len = self.scope.len();
         {
@@ -228,8 +223,8 @@ impl<S: AsRef<str>> Engine<S> {
     }
 
     fn parse_struct(&mut self, structure: &mut hcl::Structure) -> Res<()> {
-        let mut ctx = self.varlist.to_hcl_ctx(&self.scope);
-        Self::init_ctx(&mut ctx);
+        let mut ctx = self.ctx_init.clone();
+        self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
         if let Some(attr) = structure.as_attribute_mut() {
             let val = attr.expr.evaluate(&ctx)?;
             self.varlist
@@ -247,8 +242,8 @@ impl<S: AsRef<str>> Engine<S> {
     /// The following scenarios would terminate the function immediately:
     /// - failure to evalutate an hcl expression
     /// - syntax error
-    pub fn parse(&mut self) -> Res<hcl::Body> {
-        let mut body = hcl::parse(self.content.as_ref())?;
+    pub fn parse(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
+        let mut body = hcl::parse(content.as_ref())?;
         for structure in &mut body {
             self.parse_struct(structure)?;
         }
