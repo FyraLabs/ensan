@@ -493,4 +493,69 @@ pub mod hashing {
         hasher.update(s.as_bytes());
         Ok(format!("{:x}", hasher.finalize()).into())
     }
+    // todo: make Nullable work when only one argument is passed?
+    /// Hash a string using bcrypt
+    ///
+    /// Accepts: String, Nullable(Number)
+    ///
+    /// Returns: String
+    ///
+    /// Example:
+    ///
+    /// ```ignore // Test is ignored here because bcrypt is not deterministic, so we can't really compare the output
+    /// use bcrypt::hash;
+    ///
+    /// let ex_str = "hello";
+    ///
+    /// let hash_result = hash(ex_str, 10).unwrap();
+    ///
+    /// let hcl_str = format!(r#"hi = bcrypt("{}", 10)"#, ex_str);
+    /// let eval = ensan::parse(&hcl_str).unwrap();
+    ///
+    /// let expected = ensan::parse(&format!(r#"hi = "{}""#, hash_result)).unwrap();
+    ///
+    /// assert_eq!(eval, expected);
+    /// ```
+    #[ensan_fn(String, Nullable(Number))]
+    pub fn bcrypt(args: FuncArgs) -> FnRes {
+        use bcrypt::hash;
+        // Ok, time to do this the old-fashioned way
+
+        must_let!([Value::String(s), cost] = &args[..]);
+        let cost = cost.as_u64().unwrap_or(10).try_into().unwrap();
+        Ok(hash(s, cost)
+            .map_err(|e| format!("Failed to hash string with bcrypt: {e}"))?
+            .into())
+    }
+}
+
+#[ensan_proc_macro::ensan_internal_fn_mod(uuid)]
+pub mod uuid {
+    use super::*;
+    use ::uuid::Uuid;
+
+    /// Generate a random UUID
+    ///
+    /// Accepts: None
+    ///
+    /// Returns: String
+    ///
+    #[ensan_fn()]
+    pub fn uuidv4(_args: FuncArgs) -> FnRes {
+        Ok(uuid::Uuid::new_v4().to_string().into())
+    }
+
+    /// Generate a UUIDv5 from a namespace and a name
+    /// 
+    /// Accepts: String, String
+    /// 
+    /// Returns: String
+    /// 
+    #[ensan_fn(String, String)]
+    pub fn uuidv5(args: FuncArgs) -> FnRes {
+        must_let!([Value::String(ns), Value::String(name)] = &args[..]);
+        let ns = Uuid::parse_str(ns).map_err(|e| format!("Failed to parse UUID: {e}"))?;
+        Ok(Uuid::new_v5(&ns, name.as_bytes()).to_string().into())
+    }
+
 }
