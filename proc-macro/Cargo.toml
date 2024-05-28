@@ -2,6 +2,12 @@
 name = "ensan-proc-macro"
 version = "0.1.0"
 edition = "2021"
+description = "Proc macros for the ensan crate"
+license = "MIT"
+repository = "https://github.com/FyraLabs/ensan"
+readme = "../README.md"
+keywords = []
+categories = []
 
 [lib]
 proc-macro = true

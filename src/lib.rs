@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![warn(clippy::cargo)]
 #![warn(clippy::complexity)]
 #![warn(clippy::correctness)]
 #![warn(clippy::nursery)]
@@ -22,6 +21,7 @@
 pub mod engine;
 pub mod errors;
 pub mod functions;
+pub mod tests;
 
 pub use engine::Engine;
 pub use errors::Error;
@@ -31,6 +31,9 @@ pub use errors::Error;
 /// Outputs a fully-evaluated `hcl::Body` object, which is `hcl-rs`'s representation of an HCL file.
 ///
 /// This type also implements `serde::Deserialize`, so you can easily convert it to any format you want.
+///
+/// # Errors
+/// Failure to parse the HCL or evalutate any expressions would result in an error.
 ///
 /// # Example
 ///

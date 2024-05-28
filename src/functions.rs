@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::needless_pass_by_value)]
 //! # HCL functions
 //!
 //! This module contains a re-implementations of the HCL2 built-in functions in Rust.
@@ -6,7 +8,7 @@
 //! allowing for a consistent experience between gohcl and ensan/hcl-rs.
 //!
 //! The code is currently a work in progress and is not yet complete, see
-//! https://developer.hashicorp.com/terraform/language/functions for the full list of functions both implemented and not implemented.
+//! <https://developer.hashicorp.com/terraform/language/functions> for the full list of functions both implemented and not implemented.
 
 // TODO: Figure out why Value::String values include the quotes, and fix it or report it as a bug upstream!
 use hcl::{eval::FuncArgs, Value};
@@ -21,7 +23,7 @@ macro_rules! must_let {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(yaml)]
 pub mod yaml {
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
 
     /// Serializes YAML from a string to HCL
     ///
@@ -43,9 +45,10 @@ pub mod yaml {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_yamldecode() {
-        crate::parse(r#"hi = yamldecode()"#).expect_err("yamldecode() runs without args");
-        crate::parse(r#"hi = yamldecode(1)"#).expect_err("yamldecode() runs with wrong-type args");
+        crate::parse(r"hi = yamldecode()").expect_err("yamldecode() runs without args");
+        crate::parse(r"hi = yamldecode(1)").expect_err("yamldecode() runs with wrong-type args");
     }
 
     /// Deserializes HCL from a object to YAML
@@ -78,7 +81,7 @@ pub mod yaml {
 pub mod string_manipulation {
     use itertools::Itertools;
 
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
     /// Make all characters in a string lowercase
     ///
     /// Accepts: String
@@ -187,7 +190,7 @@ pub mod string_manipulation {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(ensan_builtin_fns)]
 pub mod ensan_internal_fns {
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
 
     /// Get value from environment variable
     ///

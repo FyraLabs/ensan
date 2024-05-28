@@ -37,6 +37,7 @@
 //!
 //! let mut engine = Engine::new();
 //! let body = engine.parse(cfg).unwrap();
+//! engine.clean_up();
 //! let body2 = engine.parse(expected).unwrap();
 //!
 //! println!("{body:?}");
@@ -49,6 +50,7 @@ use hcl::{
     eval::{Context, Evaluate},
     Value,
 };
+use itertools::Itertools;
 
 /// Internal result type
 type Res<T> = Result<T, crate::Error>;
@@ -193,6 +195,13 @@ impl Engine<'_> {
             ..Default::default()
         }
     }
+    /// Clean up the engine for parsing some other hcl strings.
+    /// This does not reinitialize `ctx_init`.
+    pub fn clean_up(&mut self) -> &mut Self {
+        self.scope = vec![];
+        self.varlist = VarScopes::default();
+        self
+    }
     // NOTE: since 0.1.2 we are only calling this once then we just clone `self.ctx_init`
     // everytime we want a new context. This is because `ctx.declare_func()` is actually pretty
     // expensive. According to my benchmarks using flamegraph, during execution of
@@ -212,24 +221,42 @@ impl Engine<'_> {
             self.scope.push(block.identifier.to_string());
             self.scope
                 .extend(block.labels.iter().map(|bl| bl.to_owned().into_inner()));
+            // assumes ctx could only be inserted for same scope
+            let mut ctx = self.ctx_init.clone();
+            self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
             for structure in &mut block.body {
-                self.parse_struct(structure)?;
+                self.parse_struct(structure, &mut ctx)?;
             }
         }
         self.scope.drain(old_scope_len..);
         Ok(())
     }
 
-    fn parse_struct(&mut self, structure: &mut hcl::Structure) -> Res<()> {
-        let mut ctx = self.ctx_init.clone();
-        self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
+    fn parse_struct(&mut self, structure: &mut hcl::Structure, ctx: &mut Context) -> Res<()> {
         if let Some(attr) = structure.as_attribute_mut() {
             let val = attr.expr.evaluate(&ctx)?;
             self.varlist
                 .set(&self.scope, attr.key.to_string(), val.clone());
+            // notice we are defining a new var in the same scope
+            ctx.declare_var(attr.key.clone(), val.clone());
             *attr.expr.borrow_mut() = val.into(); // NOTE: this is where we need &mut structure
         } else if let Some(block) = structure.as_block_mut() {
             self.parse_block(block)?;
+            // let labels = block
+            //     .labels
+            //     .iter()
+            //     .map(|bl| bl.to_owned().into_inner())
+            //     .collect_vec();
+            let vs: VarScopes = self
+                .varlist
+                .list_in_scope_ref(&self.scope)
+                .filter(|v| matches!(v, VarScope::Scope(k, _) if k == block.identifier()))
+                .cloned()
+                .collect_vec()
+                .into();
+            vs.populate_hcl_ctx(ctx, &vec![] as &[&str]);
+        } else {
+            unreachable!()
         };
         Ok(())
     }
@@ -242,8 +269,9 @@ impl Engine<'_> {
     /// - syntax error
     pub fn parse(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
         let mut body = hcl::parse(content.as_ref())?;
+        let mut ctx = self.ctx_init.clone();
         for structure in &mut body {
-            self.parse_struct(structure)?;
+            self.parse_struct(structure, &mut ctx)?;
         }
         Ok(body)
     }

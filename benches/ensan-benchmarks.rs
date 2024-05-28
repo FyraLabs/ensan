@@ -26,8 +26,25 @@ fn ref_attr_in_10_blks() {
     )
     .unwrap();
 }
+fn ref_attr_nblks_3_lbls() {
+    let _ = ensan::parse(
+        r#"
+        blk "one" "two" "three" {
+            bar = "baz"
+            another = bar
+            again "four" "five" "six" {
+                foo = "?"
+                hai = "bai"
+            }
+            hai = again.four.five.six.hai
+        }
+        wow = blk.one.two.three.again.four.five.six.foo
+        "#,
+    )
+    .unwrap();
+}
 
-bench_group!(criterion_refs => ref_attr_in_blk ref_attr_in_10_blks);
+bench_group!(criterion_refs => ref_attr_in_blk ref_attr_in_10_blks ref_attr_nblks_3_lbls);
 
 criterion_group!(engine_benches, criterion_refs);
 criterion_main!(engine_benches);
