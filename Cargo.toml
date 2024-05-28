@@ -23,3 +23,4 @@ serde = { version = "~1.0", features = ["derive"] }
 serde_yml = ">=0.0.7"
 thiserror = "~1"
 ensan-proc-macro = { path = "proc-macro" }
+itertools = "0.13.0"

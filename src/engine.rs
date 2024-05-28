@@ -207,6 +207,7 @@ impl<S: AsRef<str>> Engine<S> {
     fn init_ctx(ctx: &mut Context) {
         // We are going to import each function module here
         // todo: Make even more robust thing here or we can separate loading of each module by feature flags
+        // TODO: make this list customizable
         crate::functions::ensan_builtin_fns(ctx);
         crate::functions::string_manipulation(ctx);
         crate::functions::yaml(ctx);

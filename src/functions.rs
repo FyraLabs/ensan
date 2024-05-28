@@ -12,15 +12,11 @@
 use hcl::{eval::FuncArgs, Value};
 
 type FnRes = Result<Value, String>;
-/// Unquote a string
-/// Workaround for a weird bug in hcl-rs (or maybe ensan itself?) where Value::String() includes the quotes too
-pub(crate) fn unquote<S: AsRef<str>>(s: S) -> String {
-    let s = s.as_ref();
-    if s.starts_with('"') && s.ends_with('"') {
-        s[1..s.len() - 1].to_string()
-    } else {
-        s.to_string()
-    }
+
+macro_rules! must_let {
+    ($left:pat = $right:expr) => {
+        let $left = $right else { unreachable!() };
+    };
 }
 
 #[ensan_proc_macro::ensan_internal_fn_mod(yaml)]
@@ -41,11 +37,16 @@ pub mod yaml {
     /// ```
     #[ensan_fn(String)]
     pub fn yamldecode(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
+        must_let!([arg] = &args[..]);
+        must_let!(Some(arg) = arg.as_str());
 
-        let args = unquote(args.to_string());
+        serde_yml::from_str(&arg).map_err(|e| format!("Failed to deserialize YAML: {e}"))
+    }
 
-        serde_yml::from_str(&args).map_err(|e| format!("Failed to deserialize YAML: {}", e))
+    #[test]
+    fn test_yamldecode() {
+        crate::parse(r#"hi = yamldecode()"#).expect_err("yamldecode() runs without args");
+        crate::parse(r#"hi = yamldecode(1)"#).expect_err("yamldecode() runs with wrong-type args");
     }
 
     /// Deserializes HCL from a object to YAML
@@ -63,10 +64,10 @@ pub mod yaml {
     // todo: fix Object type
     #[ensan_fn(Any)]
     pub fn yamlencode(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
+        must_let!([arg] = &args[..]);
 
-        let ymlstring = serde_yml::to_string(args)
-            .map_err(|e| format!("Failed to serialize YAML: {}", e))?
+        let ymlstring = serde_yml::to_string(arg)
+            .map_err(|e| format!("Failed to serialize YAML: {e}"))?
             .trim()
             .to_string();
 
@@ -76,6 +77,8 @@ pub mod yaml {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(string_manipulation)]
 pub mod string_manipulation {
+    use itertools::Itertools;
+
     use super::*;
     /// Make all characters in a string lowercase
     ///
@@ -95,8 +98,10 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String)]
     pub fn lower(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
-        Ok(Value::String(unquote(args.to_string().to_lowercase())))
+        must_let!([arg] = &args[..]);
+        must_let!(Some(arg) = arg.as_str());
+
+        Ok(Value::String(arg.to_lowercase()))
     }
 
     /// Make all characters in a string uppercase
@@ -113,8 +118,10 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String)]
     pub fn upper(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
-        Ok(Value::String(unquote(args.to_string().to_uppercase())))
+        must_let!([arg] = &args[..]);
+        must_let!(Some(arg) = arg.as_str());
+
+        Ok(Value::String(arg.to_uppercase()))
     }
 
     /// Split a string into a list of string with a separator
@@ -131,26 +138,15 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String, String)]
     pub fn split(args: FuncArgs) -> FnRes {
-        let mut args = args.iter();
-        // If arg larger than 2, return error
-        if args.len() != 2 {
-            return Err("Invalid number of arguments".to_string());
-        }
-        let sep = args.next().ok_or("No separator provided")?;
+        must_let!([sep, args] = &args[..]);
+        must_let!(Some((sep, args)) = sep.as_str().zip(args.as_str()));
 
-        let sep = unquote(sep.to_string());
-
-        // Second argument is the string to split
-        let args = args.next().ok_or("No arguments provided")?;
-
-        let args = unquote(args.to_string());
-
-        let splitted: Vec<Value> = args
-            .split(&sep)
-            .map(|s| Value::String(s.to_string()))
-            .collect();
-
-        Ok(Value::Array(splitted))
+        Ok(Value::Array(
+            args.split(&sep)
+                .map(ToString::to_string)
+                .map(Value::String)
+                .collect(),
+        ))
     }
 
     /// Join a list of strings into a single string with a separator
@@ -167,23 +163,12 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String, Array(String))]
     pub fn join(args: FuncArgs) -> FnRes {
-        let mut args = args.iter();
-        // If arg larger than 2, return error
-        if args.len() != 2 {
-            return Err("Invalid number of arguments".to_string());
-        }
-        let sep = args.next().ok_or("No separator provided")?;
+        must_let!([sep, args] = &args[..]);
+        must_let!(Some((sep, args)) = sep.as_str().zip(args.as_array()));
 
-        let sep = unquote(sep.to_string());
-
-        // Second argument is the string to split
-        let args = args.next().ok_or("No arguments provided")?;
-
-        let args = args.as_array().unwrap_or_else(|| unreachable!());
-
-        let args: Vec<String> = args.iter().map(|s| unquote(s.to_string())).collect();
-
-        Ok(Value::String(args.join(&sep)))
+        Ok(Value::String(
+            args.iter().filter_map(Value::as_str).join(&sep),
+        ))
     }
 
     /// Get the length of a string
@@ -200,9 +185,8 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String)]
     pub fn strlen(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
-        let len = unquote(args.to_string()).len();
-        Ok(len.into())
+        must_let!([Value::String(s)] = &args[..]);
+        Ok(s.len().into())
     }
 }
 
@@ -225,10 +209,9 @@ pub mod ensan_internal_fns {
     /// ```
     #[ensan_fn(String)]
     pub fn env(args: FuncArgs) -> FnRes {
-        let args = args.iter().next().ok_or("No arguments provided")?;
-        let key = unquote(args.to_string());
-        std::env::var(key)
-            .map(Value::String)
-            .map_err(|e| format!("Failed to get environment variable: {}", e))
+        must_let!([Value::String(key)] = &args[..]);
+        Ok(std::env::var(key)
+            .map_err(|e| format!("Failed to get environment variable: {e}"))?
+            .into())
     }
 }
