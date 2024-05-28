@@ -23,7 +23,7 @@ macro_rules! must_let {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(encoding)]
 pub mod encoding {
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
     use base64::prelude::*;
 
     /// Serializes YAML from a string to HCL
@@ -98,8 +98,8 @@ pub mod encoding {
 
     #[test]
     fn test_jsondecode() {
-        crate::parse(r#"hi = jsondecode()"#).expect_err("jsondecode() runs without args");
-        crate::parse(r#"hi = jsondecode(1)"#).expect_err("jsondecode() runs with wrong-type args");
+        crate::parse(r"hi = jsondecode()").expect_err("jsondecode() runs without args");
+        crate::parse(r"hi = jsondecode(1)").expect_err("jsondecode() runs with wrong-type args");
     }
 
     /// Serializes HCL from an object to JSON
@@ -173,7 +173,7 @@ pub mod encoding {
 #[ensan_proc_macro::ensan_internal_fn_mod(string_manipulation)]
 /// This module contains string manipulation functions.
 pub mod string_manipulation {
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
     use itertools::Itertools;
 
     /// Make all characters in a string lowercase
@@ -348,7 +348,7 @@ pub mod ensan_internal_fns {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(hashing)]
 pub mod hashing {
-    use super::*;
+    use super::{FnRes, FuncArgs, Value};
 
     // todo: add bcrypt function once we figure out how to do optional arguments
 
@@ -533,7 +533,7 @@ pub mod hashing {
 
 #[ensan_proc_macro::ensan_internal_fn_mod(uuid)]
 pub mod uuid {
-    use super::*;
+    use super::{uuid, FnRes, FuncArgs, Value};
     use ::uuid::Uuid;
 
     /// Generate a random UUID

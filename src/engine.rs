@@ -235,7 +235,7 @@ impl Engine<'_> {
 
     fn parse_struct(&mut self, structure: &mut hcl::Structure, ctx: &mut Context) -> Res<()> {
         if let Some(attr) = structure.as_attribute_mut() {
-            let val = attr.expr.evaluate(&ctx)?;
+            let val = attr.expr.evaluate(ctx)?;
             self.varlist
                 .set(&self.scope, attr.key.to_string(), val.clone());
             // notice we are defining a new var in the same scope
@@ -255,7 +255,7 @@ impl Engine<'_> {
                 .cloned()
                 .collect_vec()
                 .into();
-            vs.populate_hcl_ctx(ctx, &vec![] as &[&str]);
+            vs.populate_hcl_ctx(ctx, &[] as &[&str]);
         } else {
             unreachable!()
         };
