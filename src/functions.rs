@@ -37,8 +37,7 @@ pub mod yaml {
     /// ```
     #[ensan_fn(String)]
     pub fn yamldecode(args: FuncArgs) -> FnRes {
-        must_let!([arg] = &args[..]);
-        must_let!(Some(arg) = arg.as_str());
+        must_let!([Value::String(arg)] = &args[..]);
 
         serde_yml::from_str(&arg).map_err(|e| format!("Failed to deserialize YAML: {e}"))
     }
@@ -98,8 +97,7 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String)]
     pub fn lower(args: FuncArgs) -> FnRes {
-        must_let!([arg] = &args[..]);
-        must_let!(Some(arg) = arg.as_str());
+        must_let!([Value::String(arg)] = &args[..]);
 
         Ok(Value::String(arg.to_lowercase()))
     }
@@ -118,8 +116,7 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String)]
     pub fn upper(args: FuncArgs) -> FnRes {
-        must_let!([arg] = &args[..]);
-        must_let!(Some(arg) = arg.as_str());
+        must_let!([Value::String(arg)] = &args[..]);
 
         Ok(Value::String(arg.to_uppercase()))
     }
@@ -138,11 +135,10 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String, String)]
     pub fn split(args: FuncArgs) -> FnRes {
-        must_let!([sep, args] = &args[..]);
-        must_let!(Some((sep, args)) = sep.as_str().zip(args.as_str()));
+        must_let!([Value::String(sep), Value::String(args)] = &args[..]);
 
         Ok(Value::Array(
-            args.split(&sep)
+            args.split(&*sep)
                 .map(ToString::to_string)
                 .map(Value::String)
                 .collect(),
@@ -163,8 +159,7 @@ pub mod string_manipulation {
     /// ```
     #[ensan_fn(String, Array(String))]
     pub fn join(args: FuncArgs) -> FnRes {
-        must_let!([sep, args] = &args[..]);
-        must_let!(Some((sep, args)) = sep.as_str().zip(args.as_array()));
+        must_let!([Value::String(sep), Value::Array(args)] = &args[..]);
 
         Ok(Value::String(
             args.iter().filter_map(Value::as_str).join(&sep),
