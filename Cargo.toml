@@ -1,6 +1,6 @@
 [package]
 name = "ensan"
-version = "0.2.0"
+version = "0.2.1"
 license = "MIT"
 edition = "2021"
 authors = ["Pornpipat Popum <cappy@fyralabs.com>", "Mado <mado@fyralabs.com>"]
@@ -30,7 +30,7 @@ hcl-rs = "~0.18"
 serde = { version = "~1.0", features = ["derive"] }
 serde_yml = { version = ">=0.0.7", optional = true }
 thiserror = "~1"
-ensan-proc-macro = { path = "proc-macro" }
+ensan-proc-macro = { path = "proc-macro", version = "0.1" }
 itertools = "0.13.0"
 md-5 = { version = "0.10", optional = true }
 sha1 = { version = "0.10", optional = true }
