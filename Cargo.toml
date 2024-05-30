@@ -15,22 +15,30 @@ exclude = ["proc-macro"]
 [workspace]
 members = ["proc-macro"]
 
+[features]
+default = ["fn-strings", "fn-encoding", "fn-hashing", "fn-misc", "fn-uuid"]
+fn-strings = []
+fn-encoding = ["serde_yml", "serde_json", "base64"]
+fn-hashing = ["md-5", "sha1", "sha2", "bcrypt"]
+fn-misc = []
+fn-uuid = ["uuid"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 hcl-rs = "~0.18"
 serde = { version = "~1.0", features = ["derive"] }
-serde_yml = ">=0.0.7"
+serde_yml = { version = ">=0.0.7", optional = true }
 thiserror = "~1"
 ensan-proc-macro = { path = "proc-macro" }
 itertools = "0.13.0"
-md-5 = "0.10"
-sha1 = "0.10"
-sha2 = "0.10"
-serde_json = "1.0"
-base64 = "0.22"
-bcrypt = "0.15.1"
-uuid = { version = "1.8.0", features = ["v5", "v4"] }
+md-5 = { version = "0.10", optional = true }
+sha1 = { version = "0.10", optional = true }
+sha2 = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+bcrypt = { version = "0.15.1", optional = true }
+uuid = { version = "1.8.0", features = ["v5", "v4"], optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

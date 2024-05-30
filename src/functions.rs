@@ -21,6 +21,7 @@ macro_rules! must_let {
     };
 }
 
+#[cfg(feature = "fn-encoding")]
 #[ensan_proc_macro::ensan_internal_fn_mod(encoding)]
 pub mod encoding {
     use super::{FnRes, FuncArgs, Value};
@@ -170,6 +171,7 @@ pub mod encoding {
     }
 }
 
+#[cfg(feature = "fn-strings")]
 #[ensan_proc_macro::ensan_internal_fn_mod(string_manipulation)]
 /// This module contains string manipulation functions.
 pub mod string_manipulation {
@@ -319,6 +321,7 @@ pub mod string_manipulation {
     }
 }
 
+#[cfg(feature = "fn-misc")]
 #[ensan_proc_macro::ensan_internal_fn_mod(ensan_builtin_fns)]
 pub mod ensan_internal_fns {
     use super::{FnRes, FuncArgs, Value};
@@ -346,6 +349,7 @@ pub mod ensan_internal_fns {
     }
 }
 
+#[cfg(feature = "fn-hashing")]
 #[ensan_proc_macro::ensan_internal_fn_mod(hashing)]
 pub mod hashing {
     use super::{FnRes, FuncArgs, Value};
@@ -532,6 +536,7 @@ pub mod hashing {
     }
 }
 
+#[cfg(feature = "fn-uuid")]
 #[ensan_proc_macro::ensan_internal_fn_mod(uuid)]
 pub mod uuid {
     use super::{uuid, FnRes, FuncArgs, Value};

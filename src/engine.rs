@@ -154,6 +154,15 @@ impl VarScopes {
         self.populate_hcl_ctx(&mut ctx, scope);
         ctx
     }
+    fn _set_populate(&mut self, scope: &[String], key: String, value: Value) {
+        let [first, rest @ ..] = scope else {
+            self.0.push(VarScope::Var(key, value));
+            return;
+        };
+        let mut new = Self::default();
+        new._set_populate(rest, key, value);
+        self.0.push(VarScope::Scope(first.to_string(), new));
+    }
     /// Create a new variable and set the value.
     ///
     /// This function assumes the variable *does NOT exist*.
@@ -168,7 +177,7 @@ impl VarScopes {
             s.set(rest, key, value);
         } else {
             let mut new = Self::default();
-            new.set(rest, key, value); // TODO: optimizations
+            new._set_populate(rest, key, value);
             self.0.push(VarScope::Scope(first.to_string(), new));
         }
     }
@@ -209,10 +218,16 @@ impl Engine<'_> {
     fn init_ctx(ctx: &mut Context) {
         // We are going to import each function module here
         // todo: Make even more robust thing here or we can separate loading of each module by feature flags
+        #[cfg(feature = "fn-misc")]
         crate::functions::ensan_builtin_fns(ctx);
+        #[cfg(feature = "fn-strings")]
         crate::functions::string_manipulation(ctx);
+        #[cfg(feature = "fn-encoding")]
         crate::functions::encoding(ctx);
+        #[cfg(feature = "fn-hashing")]
         crate::functions::hashing(ctx);
+        #[cfg(feature = "fn-uuid")]
+        crate::functions::uuid(ctx);
     }
 
     fn parse_block(&mut self, block: &mut hcl::Block) -> Res<()> {
@@ -234,31 +249,27 @@ impl Engine<'_> {
     }
 
     fn parse_struct(&mut self, structure: &mut hcl::Structure, ctx: &mut Context) -> Res<()> {
-        if let Some(attr) = structure.as_attribute_mut() {
-            let val = attr.expr.evaluate(ctx)?;
-            self.varlist
-                .set(&self.scope, attr.key.to_string(), val.clone());
-            // notice we are defining a new var in the same scope
-            ctx.declare_var(attr.key.clone(), val.clone());
-            *attr.expr.borrow_mut() = val.into(); // NOTE: this is where we need &mut structure
-        } else if let Some(block) = structure.as_block_mut() {
-            self.parse_block(block)?;
-            // let labels = block
-            //     .labels
-            //     .iter()
-            //     .map(|bl| bl.to_owned().into_inner())
-            //     .collect_vec();
-            let vs: VarScopes = self
-                .varlist
-                .list_in_scope_ref(&self.scope)
-                .filter(|v| matches!(v, VarScope::Scope(k, _) if k == block.identifier()))
-                .cloned()
-                .collect_vec()
-                .into();
-            vs.populate_hcl_ctx(ctx, &[] as &[&str]);
-        } else {
-            unreachable!()
-        };
+        match structure {
+            hcl::Structure::Attribute(attr) => {
+                let val = attr.expr.evaluate(ctx)?;
+                self.varlist
+                    .set(&self.scope, attr.key.to_string(), val.clone());
+                // notice we are defining a new var in the same scope
+                ctx.declare_var(attr.key.clone(), val.clone());
+                *attr.expr.borrow_mut() = val.into(); // NOTE: this is where we need &mut structure
+            }
+            hcl::Structure::Block(block) => {
+                self.parse_block(block)?;
+                let vs: VarScopes = self
+                    .varlist
+                    .list_in_scope_ref(&self.scope)
+                    .filter(|v| matches!(v, VarScope::Scope(k, _) if k == block.identifier()))
+                    .cloned()
+                    .collect_vec()
+                    .into();
+                vs.populate_hcl_ctx(ctx, &[] as &[&str]);
+            }
+        }
         Ok(())
     }
 
