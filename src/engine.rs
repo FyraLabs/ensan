@@ -275,9 +275,37 @@ impl Engine<'_> {
 
     /// Parse the string from hcl to an [`hcl::Body`] object.
     ///
-    /// # README
+    /// ### Differences between this and [`ensan::parse()`]
+    /// - if you use the same engine to parse multiple times, the items from the previous strings
+    /// would still be accessible in the following parses:
+    /// ```
+    /// let mut en = ensan::Engine::new();
+    /// let _ = en.parse_str(r#"foo = "bar""#).unwrap();
+    /// let _ = en.parse_str(r#"another = foo"#).unwrap(); // ok!
+    /// en.clean_up(); // remove previous stuff
+    /// let _ = en.parse_str(r#"again = foo"#).unwrap_err(); // nope
+    /// ```
+    /// - if you want to parse multiple different strings with the same set of hcl functions, it
+    /// is better to use the same `Engine` and just [`clean_up()`] every time after pasing.
     ///
-    /// ## Differences between this and [`ensan::parse()`]
+    /// # Errors
+    /// The following scenarios would terminate the function immediately:
+    /// - failure to evalutate an hcl expression
+    /// - syntax error
+    #[must_use]
+    pub fn parse_str(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
+        let mut body = hcl::parse(content.as_ref())?;
+        let mut ctx = self.ctx_init.clone();
+        self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
+        for structure in &mut body {
+            self.parse_struct(structure, &mut ctx)?;
+        }
+        Ok(body)
+    }
+
+    /// Parse the string from hcl to an [`hcl::Body`] object.
+    ///
+    /// ### Differences between this and [`ensan::parse()`]
     /// - if you use the same engine to parse multiple times, the items from the previous strings
     /// would still be accessible in the following parses:
     /// ```
@@ -296,12 +324,6 @@ impl Engine<'_> {
     /// - syntax error
     #[must_use]
     pub fn parse(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
-        let mut body = hcl::parse(content.as_ref())?;
-        let mut ctx = self.ctx_init.clone();
-        self.varlist.populate_hcl_ctx(&mut ctx, &self.scope);
-        for structure in &mut body {
-            self.parse_struct(structure, &mut ctx)?;
-        }
-        Ok(body)
+        self.parse_str(content)
     }
 }
