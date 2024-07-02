@@ -292,7 +292,6 @@ impl Engine<'_> {
     /// The following scenarios would terminate the function immediately:
     /// - failure to evalutate an hcl expression
     /// - syntax error
-    #[must_use]
     pub fn parse_str(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
         let mut body = hcl::parse(content.as_ref())?;
         let mut ctx = self.ctx_init.clone();
@@ -322,7 +321,6 @@ impl Engine<'_> {
     /// The following scenarios would terminate the function immediately:
     /// - failure to evalutate an hcl expression
     /// - syntax error
-    #[must_use]
     pub fn parse(&mut self, content: impl AsRef<str>) -> Res<hcl::Body> {
         self.parse_str(content)
     }

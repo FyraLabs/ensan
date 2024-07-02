@@ -13,7 +13,7 @@ It includes advanced DAG graph building and evaluation features, allowing evalua
 
 ## Features
 
-- Re-implementations of the HCL2 built-in functions from Terraform, Packer, and other HashiCorp tools.
+- Re-implementations of the HCL2 built-in functions from Terraform, Packer, and other `HashiCorp` tools.
 - Out-of-the-box support for evaluating references in the current document.
 - Simple API for evaluating entire documents with serde serialization support.
 
